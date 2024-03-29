@@ -138,33 +138,33 @@ export async function getMetadata(admin: Account): Promise<string> {
 
 async function main() {
 
-  const privateKeyAlice = new  Ed25519PrivateKey("0xc0b7560f4648498369994339f457929754eb1b0da42a99d35eb75f6a6124df33");
-  const alice = Account.fromPrivateKey({ privateKey:privateKeyAlice });
+  const privateKeyOwner = new  Ed25519PrivateKey("0xc0b7560f4648498369994339f457929754eb1b0da42a99d35eb75f6a6124df33");
+  const owner = Account.fromPrivateKey({ privateKey:privateKeyOwner });
 
-  const privateKeyBob = new  Ed25519PrivateKey("0xab64477b0871e1fdaf15dc836aa26573e0632f9c2f1b3322241dcf69af20dd4c");
-  const bob = Account.fromPrivateKey({ privateKey:privateKeyBob });
+  const privateKeyUser1 = new  Ed25519PrivateKey("0xab64477b0871e1fdaf15dc836aa26573e0632f9c2f1b3322241dcf69af20dd4c");
+  const user1 = Account.fromPrivateKey({ privateKey:privateKeyUser1 });
 
-  const privateKeyCharlie = new  Ed25519PrivateKey("0xfe4296f3d6a6d008fb3e9a1f4735f42bd6459454eff77dfe7706c5db96aa2aa8");
-  const charlie = Account.fromPrivateKey({ privateKey:privateKeyCharlie });
+  const privateKeyUser2 = new  Ed25519PrivateKey("0xfe4296f3d6a6d008fb3e9a1f4735f42bd6459454eff77dfe7706c5db96aa2aa8");
+  const user2 = Account.fromPrivateKey({ privateKey:privateKeyUser2 });
 
   console.log("\n=== Addresses ===");
-  console.log(`Alice: ${alice.accountAddress.toString()}`);
-  console.log(`Bob: ${bob.accountAddress.toString()}`);
-  console.log(`Charlie: ${charlie.accountAddress.toString()}`);
+  console.log(`Owner: ${owner.accountAddress.toString()}`);
+  console.log(`User1: ${user1.accountAddress.toString()}`);
+  console.log(`User2: ${user2.accountAddress.toString()}`);
 
   console.log("\n=== Compiling KCash package locally ===");
-  compilePackage("move/facoin", "move/facoin/facoin.json", [{ name: "FACoin", address: alice.accountAddress }]);
+  compilePackage("move/facoin", "move/facoin/facoin.json", [{ name: "FACoin", address: owner.accountAddress }]);
 
   const { metadataBytes, byteCode } = getPackageBytesToPublish("move/facoin/facoin.json");
 
   console.log("\n===Publishing KCash package===");
   const transaction = await aptos.publishPackageTransaction({
-    account: alice.accountAddress,
+    account: owner.accountAddress,
     metadataBytes,
     moduleBytecode: byteCode,
   });
   const response = await aptos.signAndSubmitTransaction({
-    signer: alice,
+    signer: owner,
     transaction,
   });
   console.log(`Transaction hash: ${response.hash}`);
@@ -172,20 +172,20 @@ async function main() {
     transactionHash: response.hash,
   });
   console.log("-------------------------------");
-  const metadataAddress = await getMetadata(alice);
+  const metadataAddress = await getMetadata(owner);
   console.log("metadata address:", metadataAddress);
 
   console.log("All the balances in this exmaple refer to balance in primary fungible stores of each account.");
-  console.log(`Alice's initial KCashlance: ${await getFaBalance(alice, metadataAddress)}.`);
-  console.log(`Bob's initial KCash balance: ${await getFaBalance(bob, metadataAddress)}.`);
-  console.log(`Charlie's initial balance: ${await await getFaBalance(charlie, metadataAddress)}.`);
+  console.log(`Owner's initial KCashlance: ${await getFaBalance(owner, metadataAddress)}.`);
+  console.log(`User1's initial KCash balance: ${await getFaBalance(user1, metadataAddress)}.`);
+  console.log(`User2's initial balance: ${await await getFaBalance(user2, metadataAddress)}.`);
 
-  console.log("Alice mints Charlie 100 coins.");
-  const mintCoinTransactionHash = await mintCoin(alice, alice, 100000000000000000);
+  console.log("Owner mints User2 1000000000 coins.");
+  const mintCoinTransactionHash = await mintCoin(owner, owner, 100000000000000000);
 
   await aptos.waitForTransaction({ transactionHash: mintCoinTransactionHash });
   console.log(
-    `Charlie's updated KCash primary fungible store balance: ${await getFaBalance(charlie, metadataAddress)}.`,
+    `User2's updated KCash primary fungible store balance: ${await getFaBalance(user2, metadataAddress)}.`,
   );
 
   console.log("done.");

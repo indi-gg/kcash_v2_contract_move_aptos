@@ -5,7 +5,10 @@
   "main": "simple_transfer.ts",
   "scripts": {
     "your_coin": "ts-node your_coin.ts",
-    "kcash_fungible_asset": "ts-node kcash_fungible_asset.ts"
+    "kcash_fungible_asset": "ts-node kcash_fungible_asset.ts",
+    "social_network": "ts-node social_network.ts",
+    "kcashV2": "ts-node kcashV2.ts",
+    "fa_kcash_up": "ts-node fa_kcash_up.ts"
   },
   "keywords": [],
   "author": "",

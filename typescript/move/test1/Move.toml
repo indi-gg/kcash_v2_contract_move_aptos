@@ -1,0 +1,15 @@
+[package]
+name = 'move2'
+version = '1.0.0'
+[addresses]
+person_address = "_"
+[dependencies.AptosFramework]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'testnet'
+subdir = 'aptos-move/framework/aptos-framework'
+
+[dependencies.MoveStdlib]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'testnet'
+subdir = 'aptos-move/framework/move-stdlib'
+

@@ -62,6 +62,7 @@ module FACoin::fa_coin {
         let asset = get_metadata();
         let managed_fungible_asset = authorized_borrow_refs(admin, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
+        let to_bucket = primary_fungible_store::ensure_primary_store_exists(to, "bucket");
         let fa = fungible_asset_cust::mint(&managed_fungible_asset.mint_ref, amount);
         fungible_asset_cust::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
     }// <:!:mint_to

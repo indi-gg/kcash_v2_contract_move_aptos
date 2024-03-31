@@ -110,6 +110,16 @@ module FACoin::fungible_asset_cust{
         frozen: bool,
     }
 
+    // ----Bucket for different variable
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// The store object that holds fungible assets of three different vault specific type associated with an account.
+    struct Bucket has key, store {
+        reward1 : u256;
+        reward2 : u256;
+        reward3 : u256;
+    }
+
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct FungibleAssetEvents has key {
         deposit_events: event::EventHandle<DepositEvent>,
@@ -412,9 +422,11 @@ module FACoin::fungible_asset_cust{
     }
 
     /// Mint the specified `amount` of the fungible asset.
-    public fun mint(ref: &MintRef, amount: u64): FungibleAsset acquires Supply, ConcurrentSupply {
+    public fun mint(ref: &MintRef, amount: u64, bucket: Bucket): FungibleAsset acquires Supply, ConcurrentSupply, Bucket {
         assert!(amount > 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata = ref.metadata;
+        
+
         increase_supply(&metadata, amount);
 
         FungibleAsset {

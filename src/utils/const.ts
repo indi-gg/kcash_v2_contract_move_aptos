@@ -5,9 +5,9 @@
  * Type of API endpoint for request routing
  */
 export enum AptosApiType {
-  FULLNODE,
-  INDEXER,
-  FAUCET,
+  FULLNODE = "Fullnode",
+  INDEXER = "Indexer",
+  FAUCET = "Faucet",
 }
 
 /**
@@ -42,6 +42,7 @@ export const DEFAULT_TXN_TIMEOUT_SEC = 20;
  * The default gas currency for the network.
  */
 export const APTOS_COIN = "0x1::aptos_coin::AptosCoin";
+
 export const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 export const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
 
@@ -49,7 +50,7 @@ export const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
  * The list of supported Processor types for our indexer api.
  *
  * These can be found from the processor_status table in the indexer database.
- * {@link https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql}
+ * {@link https://cloud.hasura.io/public/graphiql?endpoint=https://api.mainnet.aptoslabs.com/v1/graphql}
  */
 export enum ProcessorType {
   ACCOUNT_TRANSACTION_PROCESSOR = "account_transactions_processor",

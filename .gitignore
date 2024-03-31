@@ -1,10 +1,20 @@
-# Node.js
-node_modules
-dist
+.aptos/
+.DS_Store
+*/**/.DS_Store
+.env
+.history/
+.idea/
+.npm/
+.nyc_output/
+.vscode/
+build/
+coverage/
+dist/
+node_modules/
 npm-debug.log
-yarn-error.log
+tmp/
+indigg/typescript/facoin/facoin.json
+*.bak
 
-# Rust
-target
-Cargo.lock
-build
+# Vim swap files
+*.swp

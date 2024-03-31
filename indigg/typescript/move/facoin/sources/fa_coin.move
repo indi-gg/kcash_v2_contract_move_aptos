@@ -13,7 +13,7 @@ module FACoin::fa_coin {
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
 
-    const ASSET_SYMBOL: vector<u8> = b"PMV";
+    const ASSET_SYMBOL: vector<u8> = b"FA";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
@@ -33,7 +33,7 @@ module FACoin::fa_coin {
             utf8(b"KCash"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
-            utf8(b"https://i.ibb.co/xY1nv4z/android-icon-48x48.png"), /* icon */
+            utf8(b"http://example.com/favicon.ico"), /* icon */
             utf8(b"http://example.com"), /* project */
         );
 

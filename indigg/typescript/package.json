@@ -4,7 +4,6 @@
   "description": "",
   "main": "simple_transfer.ts",
   "scripts": {
-    "your_coin": "ts-node your_coin.ts",
     "kcash_fungible_asset": "ts-node kcash_fungible_asset.ts"
   },
   "keywords": [],
@@ -25,4 +24,3 @@
     "typescript": "latest"
   }
 }
-

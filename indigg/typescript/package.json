@@ -4,7 +4,8 @@
   "description": "",
   "main": "simple_transfer.ts",
   "scripts": {
-    "kcash_fungible_asset": "ts-node kcash_fungible_asset.ts"
+    "kcash_fungible_asset": "ts-node kcash_fungible_asset.ts",
+    "kcash_fa_cust": "ts-node kcash_fa_cust.ts"
   },
   "keywords": [],
   "author": "",

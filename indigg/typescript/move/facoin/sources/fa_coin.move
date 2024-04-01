@@ -2,8 +2,8 @@
 /// deployer will be creating a new managed fungible asset with the hardcoded supply config, name, symbol, and decimals.
 /// The address of the asset can be obtained via get_metadata(). As a simple version, it only deals with primary stores.
 module FACoin::fa_coin {
-    // use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
-    use FACoin::fungible_asset_cust::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
+    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
+    // use FACoin::fungible_asset_cust::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
     use std::error;
@@ -39,9 +39,9 @@ module FACoin::fa_coin {
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
-        let mint_ref = fungible_asset_cust::generate_mint_ref(constructor_ref);
-        let burn_ref = fungible_asset_cust::generate_burn_ref(constructor_ref);
-        let transfer_ref = fungible_asset_cust::generate_transfer_ref(constructor_ref);
+        let mint_ref = fungible_asset::generate_mint_ref(constructor_ref);
+        let burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
+        let transfer_ref = fungible_asset::generate_transfer_ref(constructor_ref);
         let metadata_object_signer = object::generate_signer(constructor_ref);
         move_to(
             &metadata_object_signer,
@@ -56,14 +56,21 @@ module FACoin::fa_coin {
         object::address_to_object<Metadata>(asset_address)
     }
 
+    //TODO: add Bucket param
     // :!:>mint
     /// Mint as the owner of metadata object and deposit to a specific account.
     public entry fun mint(admin: &signer, to: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let managed_fungible_asset = authorized_borrow_refs(admin, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
-        let fa = fungible_asset_cust::mint(&managed_fungible_asset.mint_ref, amount);
-        fungible_asset_cust::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
+
+        //TODO: Add validation for bucket sum must be equal to amount
+        let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
+
+        //pupulate bucket props
+        
+
+        fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
     }// <:!:mint_to
 
     /// Transfer as the owner of metadata object ignoring `frozen` field.
@@ -72,7 +79,7 @@ module FACoin::fa_coin {
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
-        fungible_asset_cust::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
+        fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
 
     /// Burn fungible assets as the owner of metadata object.
@@ -80,7 +87,7 @@ module FACoin::fa_coin {
         let asset = get_metadata();
         let burn_ref = &authorized_borrow_refs(admin, asset).burn_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
-        fungible_asset_cust::burn_from(burn_ref, from_wallet, amount);
+        fungible_asset::burn_from(burn_ref, from_wallet, amount);
     }
 
     /// Freeze an account so it cannot transfer or receive fungible assets.
@@ -88,7 +95,7 @@ module FACoin::fa_coin {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, asset);
-        fungible_asset_cust::set_frozen_flag(transfer_ref, wallet, true);
+        fungible_asset::set_frozen_flag(transfer_ref, wallet, true);
     }
 
     /// Unfreeze an account so it can transfer or receive fungible assets.
@@ -96,7 +103,7 @@ module FACoin::fa_coin {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, asset);
-        fungible_asset_cust::set_frozen_flag(transfer_ref, wallet, false);
+        fungible_asset::set_frozen_flag(transfer_ref, wallet, false);
     }
 
     /// Withdraw as the owner of metadata object ignoring `frozen` field.
@@ -104,7 +111,7 @@ module FACoin::fa_coin {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
-        fungible_asset_cust::withdraw_with_ref(transfer_ref, from_wallet, amount)
+        fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
     /// Deposit as the owner of metadata object ignoring `frozen` field.
@@ -112,7 +119,7 @@ module FACoin::fa_coin {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
-        fungible_asset_cust::deposit_with_ref(transfer_ref, to_wallet, fa);
+        fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
     /// Borrow the immutable reference of the refs of `metadata`.

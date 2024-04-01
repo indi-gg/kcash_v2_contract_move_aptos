@@ -178,7 +178,7 @@ async function main() {
   console.log("All the balances in this exmaple refer to balance in primary fungible stores of each account.");
   console.log(`Owner's initial KCash balance: ${await getFaBalance(owner, metadataAddress)}.`);
   console.log(`User1's initial KCash balance: ${await getFaBalance(user1, metadataAddress)}.`);
-  console.log(`User2's initial balance: ${await await getFaBalance(user2, metadataAddress)}.`);
+  console.log(`User2's initial balance: ${await getFaBalance(user2, metadataAddress)}.`);
 
   console.log("Owner mints Owner 1000000000 coins.");
   const mintCoinTransactionHash = await mintCoin(owner, owner, 100000000000000000);

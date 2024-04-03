@@ -107,27 +107,11 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>,
         /// The balance of the fungible metadata.
         balance: u64,
+        reward1: u64,
+        reward2: u64,
+        reward3: u64,
         /// If true, owner transfer is disabled that only `TransferRef` can move in/out from this store.
         frozen: bool,
-        /// Additional variables
-        reward1 : u64,
-        reward2 : u64,
-        reward3 : u64,
-    }
-
-    // #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    // /// The store object that holds fungible assets in different variables of a specific type associated with an account.
-    // struct Bucket has key {
-    //     reward1 : u64,
-    //     reward2 : u64,
-    //     reward3 : u64,
-    // }
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct FungibleAssetEvents has key {
-        deposit_events: event::EventHandle<DepositEvent>,
-        withdraw_events: event::EventHandle<WithdrawEvent>,
-        frozen_events: event::EventHandle<FrozenEvent>,
     }
 
     /// FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
@@ -135,9 +119,6 @@ module aptos_framework::fungible_asset {
     struct FungibleAsset {
         metadata: Object<Metadata>,
         amount: u64,
-        reward_amount1 : u64,
-        reward_amount2 : u64,
-        reward_amount3 : u64,
     }
 
     /// MintRef can be used to mint the fungible asset into an account's store.
@@ -156,18 +137,24 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>
     }
 
+    #[event]
     /// Emitted when fungible assets are deposited into a store.
-    struct DepositEvent has drop, store {
+    struct Deposit has drop, store {
+        store: address,
         amount: u64,
     }
 
+    #[event]
     /// Emitted when fungible assets are withdrawn from a store.
-    struct WithdrawEvent has drop, store {
+    struct Withdraw has drop, store {
+        store: address,
         amount: u64,
     }
 
+    #[event]
     /// Emitted when a store's frozen status is updated.
-    struct FrozenEvent has drop, store {
+    struct Frozen has drop, store {
+        store: address,
         frozen: bool,
     }
 
@@ -204,7 +191,7 @@ module aptos_framework::fungible_asset {
             }
         );
 
-        if (features::concurrent_assets_enabled()) {
+        if (features::concurrent_fungible_assets_enabled()) {
             let unlimited = option::is_none(&maximum_supply);
             move_to(metadata_object_signer, ConcurrentSupply {
                 current: if (unlimited) {
@@ -365,7 +352,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleStore, FungibleAssetEvents {
+    ) acquires FungibleStore {
         let fa = withdraw(sender, from, amount);
         deposit(to, fa);
     }
@@ -380,19 +367,11 @@ module aptos_framework::fungible_asset {
         move_to(store_obj, FungibleStore {
             metadata: object::convert(metadata),
             balance: 0,
+            reward1: 0,
+            reward2: 0,
+            reward3: 0,
             frozen: false,
-            reward1 : 0,
-            reward2 : 0,
-            reward3 : 0,
         });
-        move_to(store_obj,
-            FungibleAssetEvents {
-                deposit_events: object::new_event_handle<DepositEvent>(store_obj),
-                withdraw_events: object::new_event_handle<WithdrawEvent>(store_obj),
-                frozen_events: object::new_event_handle<FrozenEvent>(store_obj),
-            }
-        );
-
         object::object_from_constructor_ref<FungibleStore>(constructor_ref)
     }
 
@@ -400,20 +379,20 @@ module aptos_framework::fungible_asset {
     public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents {
         let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
         let addr = object::object_address(store);
-        let FungibleStore { metadata: _, balance, frozen: _, reward1, reward2, reward3 }
+        let FungibleStore { metadata: _, balance, reward1, reward2, reward3, frozen: _ }
             = move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
-        assert!(reward1 == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
-        assert!(reward2 == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
-        assert!(reward3 == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
-        let FungibleAssetEvents {
-            deposit_events,
-            withdraw_events,
-            frozen_events,
-        } = move_from<FungibleAssetEvents>(addr);
-        event::destroy_handle(deposit_events);
-        event::destroy_handle(withdraw_events);
-        event::destroy_handle(frozen_events);
+        // Cleanup deprecated event handles if exist.
+        if (exists<FungibleAssetEvents>(addr)) {
+            let FungibleAssetEvents {
+                deposit_events,
+                withdraw_events,
+                frozen_events,
+            } = move_from<FungibleAssetEvents>(addr);
+            event::destroy_handle(deposit_events);
+            event::destroy_handle(withdraw_events);
+            event::destroy_handle(frozen_events);
+        }
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
@@ -421,37 +400,34 @@ module aptos_framework::fungible_asset {
         owner: &signer,
         store: Object<T>,
         amount: u64,
-    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
+    ): FungibleAsset acquires FungibleStore {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         withdraw_internal(object::object_address(&store), amount)
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
-    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
+    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         deposit_internal(store, fa);
     }
 
     /// Mint the specified `amount` of the fungible asset.
-    public fun mint(ref: &MintRef, amount: u64, r1: u64, r2: u64, r3: u64): FungibleAsset acquires Supply, ConcurrentSupply {
+    public fun mint(ref: &MintRef, amount: u64): FungibleAsset acquires Supply, ConcurrentSupply {
         assert!(amount > 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata = ref.metadata;
         increase_supply(&metadata, amount);
 
         FungibleAsset {
             metadata,
-            amount,
-            reward_amount1:r1,
-            reward_amount2:r2,
-            reward_amount3:r3
+            amount
         }
     }
 
     /// Mint the specified `amount` of the fungible asset to a destination store.
-    public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64, r1: u64, r2: u64, r3: u64)
-    acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
-        deposit(store, mint(ref, amount, r1, r2, r3));
+    public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
+    acquires FungibleStore, Supply, ConcurrentSupply {
+        deposit(store, mint(ref, amount));
     }
 
     /// Enable/disable a store's ability to do direct transfers of the fungible asset.
@@ -459,7 +435,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         frozen: bool,
-    ) acquires FungibleStore, FungibleAssetEvents {
+    ) acquires FungibleStore {
         assert!(
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
@@ -467,8 +443,7 @@ module aptos_framework::fungible_asset {
         let store_addr = object::object_address(&store);
         borrow_global_mut<FungibleStore>(store_addr).frozen = frozen;
 
-        let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
-        event::emit_event(&mut events.frozen_events, FrozenEvent { frozen });
+        event::emit(Frozen { store: store_addr, frozen });
     }
 
     /// Burns a fungible asset
@@ -476,7 +451,6 @@ module aptos_framework::fungible_asset {
         let FungibleAsset {
             metadata,
             amount,
-            reward_amount1:_, reward_amount2:_, reward_amount3:_
         } = fa;
         assert!(ref.metadata == metadata, error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH));
         decrease_supply(&metadata, amount);
@@ -487,7 +461,7 @@ module aptos_framework::fungible_asset {
         ref: &BurnRef,
         store: Object<T>,
         amount: u64
-    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, Supply, ConcurrentSupply {
         let metadata = ref.metadata;
         assert!(metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
@@ -499,7 +473,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         amount: u64
-    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
+    ): FungibleAsset acquires FungibleStore {
         assert!(
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
@@ -512,12 +486,11 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         fa: FungibleAsset
-    ) acquires FungibleStore, FungibleAssetEvents {
+    ) acquires FungibleStore {
         assert!(
             ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
         );
-        // internal_mint(ref, bucket, store);
         deposit_internal(store, fa);
     }
 
@@ -527,7 +500,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleStore, FungibleAssetEvents {
+    ) acquires FungibleStore {
         let fa = withdraw_with_ref(transfer_ref, from, amount);
         deposit_with_ref(transfer_ref, to, fa);
     }
@@ -538,9 +511,6 @@ module aptos_framework::fungible_asset {
         FungibleAsset {
             metadata: object::convert(metadata),
             amount: 0,
-            reward_amount1: 0,
-            reward_amount2: 0,
-            reward_amount3: 0,
         }
     }
 
@@ -551,28 +521,25 @@ module aptos_framework::fungible_asset {
         FungibleAsset {
             metadata: fungible_asset.metadata,
             amount,
-            reward_amount1:0,
-            reward_amount2:0,
-            reward_amount3:0,
         }
     }
 
     /// "Merges" the two given fungible assets. The fungible asset passed in as `dst_fungible_asset` will have a value
     /// equal to the sum of the two (`dst_fungible_asset` and `src_fungible_asset`).
     public fun merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
-        let FungibleAsset { metadata, amount, reward_amount1:_, reward_amount2:_, reward_amount3:_} = src_fungible_asset;
+        let FungibleAsset { metadata, amount } = src_fungible_asset;
         assert!(metadata == dst_fungible_asset.metadata, error::invalid_argument(EFUNGIBLE_ASSET_MISMATCH));
         dst_fungible_asset.amount = dst_fungible_asset.amount + amount;
     }
 
     /// Destroy an empty fungible asset.
     public fun destroy_zero(fungible_asset: FungibleAsset) {
-        let FungibleAsset { amount, metadata: _,reward_amount1:_, reward_amount2:_, reward_amount3:_} = fungible_asset;
+        let FungibleAsset { amount, metadata: _ } = fungible_asset;
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
-        let FungibleAsset { metadata, amount, reward_amount1, reward_amount2, reward_amount3 } = fa;
+    fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
+        let FungibleAsset { metadata, amount } = fa;
         if (amount == 0) return;
 
         let store_metadata = store_metadata(store);
@@ -580,46 +547,24 @@ module aptos_framework::fungible_asset {
         let store_addr = object::object_address(&store);
         let store = borrow_global_mut<FungibleStore>(store_addr);
         store.balance = store.balance + amount;
-        store.reward1 = store.reward1 + reward_amount1;
-        store.reward2 = store.reward2 + reward_amount2;
-        store.reward3 = store.reward3 + reward_amount3;
 
-
-        let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
-        event::emit_event(&mut events.deposit_events, DepositEvent { amount });
+        event::emit<Deposit>(Deposit { store: store_addr, amount });
     }
-
-    /// Internal mint function
-    // fun internal_mint<T: key>(ref: &MintRef, bucket: Bucket, store: address) acquires Bucket{
-
-    //     let Bucket {reward1, reward2, reward3 } = bucket;
-    //     let user_bucket = borrow_global_mut<Bucket>(store);
-    //     user_bucket.reward1 = user_bucket.reward1+reward1;
-    //     user_bucket.reward2 = user_bucket.reward2+reward2;
-    //     user_bucket.reward3 = user_bucket.reward3+reward3;
-    // }
 
     /// Extract `amount` of the fungible asset from `store`.
     fun withdraw_internal(
         store_addr: address,
         amount: u64,
-    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
+    ): FungibleAsset acquires FungibleStore {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         store.balance = store.balance - amount;
 
-        let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
         let metadata = store.metadata;
-        event::emit_event(&mut events.withdraw_events, WithdrawEvent { amount });
+        event::emit<Withdraw>(Withdraw { store: store_addr, amount });
 
-        FungibleAsset { 
-            metadata, 
-            amount,
-            reward_amount1:0,
-            reward_amount2:0,
-            reward_amount3:0,
-        }
+        FungibleAsset { metadata, amount }
     }
 
     /// Increase the supply of a fungible asset by minting.
@@ -696,7 +641,7 @@ module aptos_framework::fungible_asset {
     ) acquires Supply {
         let metadata_object_address = object::address_from_extend_ref(ref);
         let metadata_object_signer = object::generate_signer_for_extending(ref);
-        assert!(features::concurrent_assets_enabled(), error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED));
+        assert!(features::concurrent_fungible_assets_enabled(), error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED));
         assert!(exists<Supply>(metadata_object_address), error::not_found(ESUPPLY_NOT_FOUND));
         let Supply {
             current,
@@ -717,226 +662,251 @@ module aptos_framework::fungible_asset {
         move_to(&metadata_object_signer, supply);
     }
 
-    // #[test_only]
-    // use aptos_framework::account;
+    #[test_only]
+    use aptos_framework::account;
 
-    // #[test_only]
-    // #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[test_only]
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
 
-    // struct TestToken has key {}
+    struct TestToken has key {}
 
-    // #[test_only]
-    // public fun create_test_token(creator: &signer): (ConstructorRef, Object<TestToken>) {
-    //     account::create_account_for_test(signer::address_of(creator));
-    //     let creator_ref = object::create_named_object(creator, b"TEST");
-    //     let object_signer = object::generate_signer(&creator_ref);
-    //     move_to(&object_signer, TestToken {});
+    #[test_only]
+    public fun create_test_token(creator: &signer): (ConstructorRef, Object<TestToken>) {
+        account::create_account_for_test(signer::address_of(creator));
+        let creator_ref = object::create_named_object(creator, b"TEST");
+        let object_signer = object::generate_signer(&creator_ref);
+        move_to(&object_signer, TestToken {});
 
-    //     let token = object::object_from_constructor_ref<TestToken>(&creator_ref);
-    //     (creator_ref, token)
-    // }
+        let token = object::object_from_constructor_ref<TestToken>(&creator_ref);
+        (creator_ref, token)
+    }
 
-    // #[test_only]
-    // public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef) {
-    //     add_fungibility(
-    //         constructor_ref,
-    //         option::some(100) /* max supply */,
-    //         string::utf8(b"TEST"),
-    //         string::utf8(b"@@"),
-    //         0,
-    //         string::utf8(b"http://www.example.com/favicon.ico"),
-    //         string::utf8(b"http://www.example.com"),
-    //     );
-    //     let mint_ref = generate_mint_ref(constructor_ref);
-    //     let burn_ref = generate_burn_ref(constructor_ref);
-    //     let transfer_ref = generate_transfer_ref(constructor_ref);
-    //     (mint_ref, transfer_ref, burn_ref)
-    // }
+    #[test_only]
+    public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef) {
+        add_fungibility(
+            constructor_ref,
+            option::some(100) /* max supply */,
+            string::utf8(b"TEST"),
+            string::utf8(b"@@"),
+            0,
+            string::utf8(b"http://www.example.com/favicon.ico"),
+            string::utf8(b"http://www.example.com"),
+        );
+        let mint_ref = generate_mint_ref(constructor_ref);
+        let burn_ref = generate_burn_ref(constructor_ref);
+        let transfer_ref = generate_transfer_ref(constructor_ref);
+        (mint_ref, transfer_ref, burn_ref)
+    }
 
-    // #[test_only]
-    // public fun create_fungible_asset(
-    //     creator: &signer
-    // ): (MintRef, TransferRef, BurnRef, Object<Metadata>) {
-    //     let (creator_ref, token_object) = create_test_token(creator);
-    //     let (mint, transfer, burn) = init_test_metadata(&creator_ref);
-    //     (mint, transfer, burn, object::convert(token_object))
-    // }
+    #[test_only]
+    public fun create_fungible_asset(
+        creator: &signer
+    ): (MintRef, TransferRef, BurnRef, Object<Metadata>) {
+        let (creator_ref, token_object) = create_test_token(creator);
+        let (mint, transfer, burn) = init_test_metadata(&creator_ref);
+        (mint, transfer, burn, object::convert(token_object))
+    }
 
-    // #[test_only]
-    // public fun create_test_store<T: key>(owner: &signer, metadata: Object<T>): Object<FungibleStore> {
-    //     let owner_addr = signer::address_of(owner);
-    //     if (!account::exists_at(owner_addr)) {
-    //         account::create_account_for_test(owner_addr);
-    //     };
-    //     create_store(&object::create_object_from_account(owner), metadata)
-    // }
+    #[test_only]
+    public fun create_test_store<T: key>(owner: &signer, metadata: Object<T>): Object<FungibleStore> {
+        let owner_addr = signer::address_of(owner);
+        if (!account::exists_at(owner_addr)) {
+            account::create_account_for_test(owner_addr);
+        };
+        create_store(&object::create_object_from_account(owner), metadata)
+    }
 
-    // #[test(creator = @0xcafe)]
-    // fun test_metadata_basic_flow(creator: &signer) acquires Metadata, Supply, ConcurrentSupply {
-    //     let (creator_ref, metadata) = create_test_token(creator);
-    //     init_test_metadata(&creator_ref);
-    //     assert!(supply(metadata) == option::some(0), 1);
-    //     assert!(maximum(metadata) == option::some(100), 2);
-    //     assert!(name(metadata) == string::utf8(b"TEST"), 3);
-    //     assert!(symbol(metadata) == string::utf8(b"@@"), 4);
-    //     assert!(decimals(metadata) == 0, 5);
+    #[test(creator = @0xcafe)]
+    fun test_metadata_basic_flow(creator: &signer) acquires Metadata, Supply, ConcurrentSupply {
+        let (creator_ref, metadata) = create_test_token(creator);
+        init_test_metadata(&creator_ref);
+        assert!(supply(metadata) == option::some(0), 1);
+        assert!(maximum(metadata) == option::some(100), 2);
+        assert!(name(metadata) == string::utf8(b"TEST"), 3);
+        assert!(symbol(metadata) == string::utf8(b"@@"), 4);
+        assert!(decimals(metadata) == 0, 5);
 
-    //     increase_supply(&metadata, 50);
-    //     assert!(supply(metadata) == option::some(50), 6);
-    //     decrease_supply(&metadata, 30);
-    //     assert!(supply(metadata) == option::some(20), 7);
-    // }
+        increase_supply(&metadata, 50);
+        assert!(supply(metadata) == option::some(50), 6);
+        decrease_supply(&metadata, 30);
+        assert!(supply(metadata) == option::some(20), 7);
+    }
 
-    // #[test(creator = @0xcafe)]
-    // #[expected_failure(abort_code = 0x20005, location = Self)]
-    // fun test_supply_overflow(creator: &signer) acquires Supply, ConcurrentSupply {
-    //     let (creator_ref, metadata) = create_test_token(creator);
-    //     init_test_metadata(&creator_ref);
-    //     increase_supply(&metadata, 101);
-    // }
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x20005, location = Self)]
+    fun test_supply_overflow(creator: &signer) acquires Supply, ConcurrentSupply {
+        let (creator_ref, metadata) = create_test_token(creator);
+        init_test_metadata(&creator_ref);
+        increase_supply(&metadata, 101);
+    }
 
-    // #[test(creator = @0xcafe)]
-    // fun test_create_and_remove_store(creator: &signer) acquires FungibleStore, FungibleAssetEvents {
-    //     let (_, _, _, metadata) = create_fungible_asset(creator);
-    //     let creator_ref = object::create_object_from_account(creator);
-    //     create_store(&creator_ref, metadata);
-    //     let delete_ref = object::generate_delete_ref(&creator_ref);
-    //     remove_store(&delete_ref);
-    // }
+    #[test(creator = @0xcafe)]
+    fun test_create_and_remove_store(creator: &signer) acquires FungibleStore, FungibleAssetEvents {
+        let (_, _, _, metadata) = create_fungible_asset(creator);
+        let creator_ref = object::create_object_from_account(creator);
+        create_store(&creator_ref, metadata);
+        let delete_ref = object::generate_delete_ref(&creator_ref);
+        remove_store(&delete_ref);
+    }
 
-    // #[test(creator = @0xcafe, aaron = @0xface)]
-    // fun test_e2e_basic_flow(
-    //     creator: &signer,
-    //     aaron: &signer,
-    // ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
-    //     let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
-    //     let metadata = mint_ref.metadata;
-    //     let creator_store = create_test_store(creator, metadata);
-    //     let aaron_store = create_test_store(aaron, metadata);
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    fun test_e2e_basic_flow(
+        creator: &signer,
+        aaron: &signer,
+    ) acquires FungibleStore, Supply, ConcurrentSupply {
+        let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+        let creator_store = create_test_store(creator, metadata);
+        let aaron_store = create_test_store(aaron, metadata);
 
-    //     assert!(supply(test_token) == option::some(0), 1);
-    //     // Mint
-    //     let fa = mint(&mint_ref, 100);
-    //     assert!(supply(test_token) == option::some(100), 2);
-    //     // Deposit
-    //     deposit(creator_store, fa);
-    //     // Withdraw
-    //     let fa = withdraw(creator, creator_store, 80);
-    //     assert!(supply(test_token) == option::some(100), 3);
-    //     deposit(aaron_store, fa);
-    //     // Burn
-    //     burn_from(&burn_ref, aaron_store, 30);
-    //     assert!(supply(test_token) == option::some(70), 4);
-    //     // Transfer
-    //     transfer(creator, creator_store, aaron_store, 10);
-    //     assert!(balance(creator_store) == 10, 5);
-    //     assert!(balance(aaron_store) == 60, 6);
+        assert!(supply(test_token) == option::some(0), 1);
+        // Mint
+        let fa = mint(&mint_ref, 100);
+        assert!(supply(test_token) == option::some(100), 2);
+        // Deposit
+        deposit(creator_store, fa);
+        // Withdraw
+        let fa = withdraw(creator, creator_store, 80);
+        assert!(supply(test_token) == option::some(100), 3);
+        deposit(aaron_store, fa);
+        // Burn
+        burn_from(&burn_ref, aaron_store, 30);
+        assert!(supply(test_token) == option::some(70), 4);
+        // Transfer
+        transfer(creator, creator_store, aaron_store, 10);
+        assert!(balance(creator_store) == 10, 5);
+        assert!(balance(aaron_store) == 60, 6);
 
-    //     set_frozen_flag(&transfer_ref, aaron_store, true);
-    //     assert!(is_frozen(aaron_store), 7);
-    // }
+        set_frozen_flag(&transfer_ref, aaron_store, true);
+        assert!(is_frozen(aaron_store), 7);
+    }
 
-    // #[test(creator = @0xcafe)]
-    // #[expected_failure(abort_code = 0x10003, location = Self)]
-    // fun test_frozen(
-    //     creator: &signer
-    // ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
-    //     let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x10003, location = Self)]
+    fun test_frozen(
+        creator: &signer
+    ) acquires FungibleStore, Supply, ConcurrentSupply {
+        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
-    //     let creator_store = create_test_store(creator, mint_ref.metadata);
-    //     let fa = mint(&mint_ref, 100);
-    //     set_frozen_flag(&transfer_ref, creator_store, true);
-    //     deposit(creator_store, fa);
-    // }
+        let creator_store = create_test_store(creator, mint_ref.metadata);
+        let fa = mint(&mint_ref, 100);
+        set_frozen_flag(&transfer_ref, creator_store, true);
+        deposit(creator_store, fa);
+    }
 
-    // #[test(creator = @0xcafe, aaron = @0xface)]
-    // fun test_transfer_with_ref(
-    //     creator: &signer,
-    //     aaron: &signer,
-    // ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
-    //     let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
-    //     let metadata = mint_ref.metadata;
-    //     let creator_store = create_test_store(creator, metadata);
-    //     let aaron_store = create_test_store(aaron, metadata);
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    fun test_transfer_with_ref(
+        creator: &signer,
+        aaron: &signer,
+    ) acquires FungibleStore, Supply, ConcurrentSupply {
+        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+        let creator_store = create_test_store(creator, metadata);
+        let aaron_store = create_test_store(aaron, metadata);
 
-    //     let fa = mint(&mint_ref, 100);
-    //     set_frozen_flag(&transfer_ref, creator_store, true);
-    //     set_frozen_flag(&transfer_ref, aaron_store, true);
-    //     deposit_with_ref(&transfer_ref, creator_store, fa);
-    //     transfer_with_ref(&transfer_ref, creator_store, aaron_store, 80);
-    //     assert!(balance(creator_store) == 20, 1);
-    //     assert!(balance(aaron_store) == 80, 2);
-    //     assert!(!!is_frozen(creator_store), 3);
-    //     assert!(!!is_frozen(aaron_store), 4);
-    // }
+        let fa = mint(&mint_ref, 100);
+        set_frozen_flag(&transfer_ref, creator_store, true);
+        set_frozen_flag(&transfer_ref, aaron_store, true);
+        deposit_with_ref(&transfer_ref, creator_store, fa);
+        transfer_with_ref(&transfer_ref, creator_store, aaron_store, 80);
+        assert!(balance(creator_store) == 20, 1);
+        assert!(balance(aaron_store) == 80, 2);
+        assert!(!!is_frozen(creator_store), 3);
+        assert!(!!is_frozen(aaron_store), 4);
+    }
 
-    // #[test(creator = @0xcafe)]
-    // fun test_merge_and_exact(creator: &signer) acquires Supply, ConcurrentSupply {
-    //     let (mint_ref, _transfer_ref, burn_ref, _) = create_fungible_asset(creator);
-    //     let fa = mint(&mint_ref, 100);
-    //     let cash = extract(&mut fa, 80);
-    //     assert!(fa.amount == 20, 1);
-    //     assert!(cash.amount == 80, 2);
-    //     let more_cash = extract(&mut fa, 20);
-    //     destroy_zero(fa);
-    //     merge(&mut cash, more_cash);
-    //     assert!(cash.amount == 100, 3);
-    //     burn(&burn_ref, cash);
-    // }
+    #[test(creator = @0xcafe)]
+    fun test_merge_and_exact(creator: &signer) acquires Supply, ConcurrentSupply {
+        let (mint_ref, _transfer_ref, burn_ref, _) = create_fungible_asset(creator);
+        let fa = mint(&mint_ref, 100);
+        let cash = extract(&mut fa, 80);
+        assert!(fa.amount == 20, 1);
+        assert!(cash.amount == 80, 2);
+        let more_cash = extract(&mut fa, 20);
+        destroy_zero(fa);
+        merge(&mut cash, more_cash);
+        assert!(cash.amount == 100, 3);
+        burn(&burn_ref, cash);
+    }
 
-    // #[test(creator = @0xcafe)]
-    // #[expected_failure(abort_code = 0x10012, location = Self)]
-    // fun test_add_fungibility_to_deletable_object(creator: &signer) {
-    //     account::create_account_for_test(signer::address_of(creator));
-    //     let creator_ref = &object::create_object_from_account(creator);
-    //     init_test_metadata(creator_ref);
-    // }
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x10012, location = Self)]
+    fun test_add_fungibility_to_deletable_object(creator: &signer) {
+        account::create_account_for_test(signer::address_of(creator));
+        let creator_ref = &object::create_object_from_account(creator);
+        init_test_metadata(creator_ref);
+    }
 
-    // #[test(creator = @0xcafe, aaron = @0xface)]
-    // #[expected_failure(abort_code = 0x10006, location = Self)]
-    // fun test_fungible_asset_mismatch_when_merge(creator: &signer, aaron: &signer) {
-    //     let (_, _, _, metadata1) = create_fungible_asset(creator);
-    //     let (_, _, _, metadata2) = create_fungible_asset(aaron);
-    //     let base = FungibleAsset {
-    //         metadata: metadata1,
-    //         amount: 1,
-    //     };
-    //     let addon = FungibleAsset {
-    //         metadata: metadata2,
-    //         amount: 1
-    //     };
-    //     merge(&mut base, addon);
-    //     let FungibleAsset {
-    //         metadata: _,
-    //         amount: _
-    //     } = base;
-    // }
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
+    fun test_fungible_asset_mismatch_when_merge(creator: &signer, aaron: &signer) {
+        let (_, _, _, metadata1) = create_fungible_asset(creator);
+        let (_, _, _, metadata2) = create_fungible_asset(aaron);
+        let base = FungibleAsset {
+            metadata: metadata1,
+            amount: 1,
+        };
+        let addon = FungibleAsset {
+            metadata: metadata2,
+            amount: 1
+        };
+        merge(&mut base, addon);
+        let FungibleAsset {
+            metadata: _,
+            amount: _
+        } = base;
+    }
 
-    // #[test(fx = @aptos_framework, creator = @0xcafe)]
-    // fun test_fungible_asset_upgrade(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleAssetEvents, FungibleStore {
-    //     let feature = features::get_concurrent_assets_feature();
-    //     let agg_feature = features::get_aggregator_v2_api_feature();
-    //     features::change_feature_flags(fx, vector[], vector[feature, agg_feature]);
+    #[test(fx = @aptos_framework, creator = @0xcafe)]
+    fun test_fungible_asset_upgrade(
+        fx: &signer,
+        creator: &signer
+    ) acquires Supply, ConcurrentSupply, FungibleStore {
+        let feature = features::get_concurrent_fungible_assets_feature();
+        let agg_feature = features::get_aggregator_v2_api_feature();
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature, agg_feature]);
 
-    //     let (creator_ref, token_object) = create_test_token(creator);
-    //     let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
-    //     let test_token = object::convert<TestToken, Metadata>(token_object);
-    //     let creator_store = create_test_store(creator, test_token);
+        let (creator_ref, token_object) = create_test_token(creator);
+        let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
+        let test_token = object::convert<TestToken, Metadata>(token_object);
+        let creator_store = create_test_store(creator, test_token);
 
-    //     let fa = mint(&mint_ref, 30);
-    //     assert!(supply(test_token) == option::some(30), 2);
+        let fa = mint(&mint_ref, 30);
+        assert!(supply(test_token) == option::some(30), 2);
 
-    //     deposit_with_ref(&transfer_ref, creator_store, fa);
+        deposit_with_ref(&transfer_ref, creator_store, fa);
 
-    //     features::change_feature_flags(fx, vector[feature, agg_feature], vector[]);
+        features::change_feature_flags_for_testing(fx, vector[feature, agg_feature], vector[]);
 
-    //     let extend_ref = object::generate_extend_ref(&creator_ref);
-    //     upgrade_to_concurrent(&extend_ref);
+        let extend_ref = object::generate_extend_ref(&creator_ref);
+        upgrade_to_concurrent(&extend_ref);
 
-    //     let fb = mint(&mint_ref, 20);
-    //     assert!(supply(test_token) == option::some(50), 3);
+        let fb = mint(&mint_ref, 20);
+        assert!(supply(test_token) == option::some(50), 3);
 
-    //     deposit_with_ref(&transfer_ref, creator_store, fb);
-    // }
+        deposit_with_ref(&transfer_ref, creator_store, fb);
+    }
 
+    #[deprecated]
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct FungibleAssetEvents has key {
+        deposit_events: event::EventHandle<DepositEvent>,
+        withdraw_events: event::EventHandle<WithdrawEvent>,
+        frozen_events: event::EventHandle<FrozenEvent>,
+    }
+
+    #[deprecated]
+    struct DepositEvent has drop, store {
+        amount: u64,
+    }
+
+    #[deprecated]
+    struct WithdrawEvent has drop, store {
+        amount: u64,
+    }
+
+    #[deprecated]
+    struct FrozenEvent has drop, store {
+        frozen: bool,
+    }
 }

@@ -135,7 +135,8 @@ module kcash_addr::kcashFA {
         let to_addr = signer::address_of(to);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to_addr, asset);
 
-        let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount, reward_amount1, reward_amount2, reward_amount3);
+        // let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount, reward_amount1, reward_amount2, reward_amount3);
+        let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
 
         // Store FA in Bucket store

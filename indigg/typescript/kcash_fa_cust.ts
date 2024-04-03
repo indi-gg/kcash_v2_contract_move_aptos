@@ -92,11 +92,11 @@ async function mintCoin(
 async function main() {
   const privateKeyOwner = new Ed25519PrivateKey(
     // "0xb8c6e21fe1c09b0891703c75abe828a7867286f312743011b53d883fa621379c"
-    "0x6bbad621fb2218da99bf4926f9715f4a222d43e3772c3f52aabcf024bf1f1a1a"
+    "0xaa285ccf8700a3ea9dd01536f26f95e43dce9ec280216cc530f106c13fc71da6"
   );
   const owner = Account.fromPrivateKey({ privateKey: privateKeyOwner });
   const privateKeyUser1 = new Ed25519PrivateKey(
-    "0x846e9b8996502708d2a156a2423c47713fa398da0f0aac95e1703e8fc57556d3"
+    "0x6d50cd59474c56087d2a044e7976e7534d07efe819c3a1d71602027e60330f89"
   );
   const user1 = Account.fromPrivateKey({ privateKey: privateKeyUser1 });
 

@@ -8,5 +8,5 @@ kcash_addr = "_"
 
 [dependencies.AptosFramework]
 git = "https://github.com/indi-gg/kcash_v2_contract_move_aptos"
-rev = "mainnet"
-subdir = "aptos-framework"
+rev = "devnet"
+subdir = "framework/aptos-framework"

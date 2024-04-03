@@ -22,8 +22,7 @@ async function createWallet() {
     accountAddress: alice.accountAddress.toStringLong(),
     privateKey: alice.privateKey.toString(),
   };
-
-  fs.writeFileSync("./keys/key.json", JSON.stringify(data));
+  return data;
 }
 
 async function fundWallet(alice: AccountAddress) {
@@ -35,10 +34,15 @@ async function fundWallet(alice: AccountAddress) {
 }
 
 async function main() {
-    await createWallet();
-  let wallet = JSON.parse(fs.readFileSync("./keys/key.json", "utf8"));
+  let owner =  await createWallet();
+  fs.writeFileSync("./keys/owner.json", JSON.stringify(owner));
+  let user =  await createWallet();
+  fs.writeFileSync("./keys/user.json", JSON.stringify(user));
 
-  await fundWallet(wallet.accountAddress);
+  let own = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
+  await fundWallet(own.accountAddress);
+  let use = JSON.parse(fs.readFileSync("./keys/user.json", "utf8"));
+  await fundWallet(use.accountAddress);
 }
 
 main();

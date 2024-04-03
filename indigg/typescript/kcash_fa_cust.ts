@@ -8,6 +8,7 @@ import {
   Network,
   NetworkToNetworkName,
 } from "@aptos-labs/ts-sdk";
+import fs from "fs";
 import { compilePackage, getPackageBytesToPublish } from "./utils";
 
 // Setup the client
@@ -29,12 +30,12 @@ async function getMetadata(admin: Account): Promise<string> {
 /** Return the Bucket values */
 async function getReward1(admin: Account, user: Account): Promise<string> {
   const payload: InputViewFunctionData = {
-    function: `${admin.accountAddress}::kcashFA::get_bucket_reward1`,
+    function: `${admin.accountAddress}::kcashFA::get_fungible_store`,
     functionArguments: [user.accountAddress],
   };
-  const res = (await aptos.view<[{ inner: string }]>({ payload }))[0];
+  const res = (await aptos.view({ payload }))[0];
   console.log("🚀 ~ getReward1 ~ res:", res);
-  return res.inner;
+  return res.toString();
 }
 
 const getFaBalance = async (
@@ -90,14 +91,12 @@ async function mintCoin(
 }
 
 async function main() {
-  const privateKeyOwner = new Ed25519PrivateKey(
-    // "0xb8c6e21fe1c09b0891703c75abe828a7867286f312743011b53d883fa621379c"
-    "0xaa285ccf8700a3ea9dd01536f26f95e43dce9ec280216cc530f106c13fc71da6"
-  );
+  let owner_kp = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
+  let user_kp = JSON.parse(fs.readFileSync("./keys/user.json", "utf8"));
+
+  const privateKeyOwner = new Ed25519PrivateKey(owner_kp.privateKey);
   const owner = Account.fromPrivateKey({ privateKey: privateKeyOwner });
-  const privateKeyUser1 = new Ed25519PrivateKey(
-    "0x6d50cd59474c56087d2a044e7976e7534d07efe819c3a1d71602027e60330f89"
-  );
+  const privateKeyUser1 = new Ed25519PrivateKey(user_kp.privateKey);
   const user1 = Account.fromPrivateKey({ privateKey: privateKeyUser1 });
 
   const privateKeyUser2 = new Ed25519PrivateKey(
@@ -173,7 +172,8 @@ async function main() {
     )}.`
   );
 
-  // const reward1 = await getReward1(owner, user1);
+  const reward1 = await getReward1(owner, user1);
+  console.log("🚀 ~ main ~ reward1:", reward1);
 }
 
 main();

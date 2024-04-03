@@ -85,6 +85,12 @@ module kcash_addr::kcashFA {
         borrow_bucket(store_addr, 3)
     }
 
+    #[view]
+    /// Return the Bucket values of the user.
+    public fun get_fungible_store(store_addr: address): u64{
+        fungible_asset::balance_by_address(store_addr)
+    }
+
     inline fun borrow_bucket(store_addr: address, index: u8): u64 acquires BucketStore{
         let bs = borrow_global<BucketStore>(store_addr);
         if(index == 1) bs.reward1 else if (index == 1) bs.reward2 else bs.reward3
@@ -122,6 +128,8 @@ module kcash_addr::kcashFA {
         let asset_address = object::create_object_address(&@kcash_addr, ASSET_SYMBOL);
         object::address_to_object<Metadata>(asset_address)
     }
+
+
 
     // :!:>mint
     /// Mint as the owner of metadata object and deposit to a specific account.

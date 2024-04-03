@@ -92,6 +92,7 @@ async function mintCoin(
 
 async function main() {
   let owner_kp = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
+  console.log("🚀 ~ main ~ owner_kp:", owner_kp.accountAddress)
   let user_kp = JSON.parse(fs.readFileSync("./keys/user.json", "utf8"));
 
   const privateKeyOwner = new Ed25519PrivateKey(owner_kp.privateKey);

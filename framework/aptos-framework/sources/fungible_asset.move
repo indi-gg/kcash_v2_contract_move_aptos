@@ -107,7 +107,9 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>,
         /// The balance of the fungible metadata.
         balance: u64,
-        balance1: u64,
+        reward1: u64,
+        reward2: u64,
+        reward3: u64,
         /// If true, owner transfer is disabled that only `TransferRef` can move in/out from this store.
         frozen: bool,
     }
@@ -365,7 +367,9 @@ module aptos_framework::fungible_asset {
         move_to(store_obj, FungibleStore {
             metadata: object::convert(metadata),
             balance: 0,
-            balance1: 0,
+            reward1: 0,
+            reward2: 0,
+            reward3: 0,
             frozen: false,
         });
         object::object_from_constructor_ref<FungibleStore>(constructor_ref)
@@ -375,7 +379,7 @@ module aptos_framework::fungible_asset {
     public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents {
         let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
         let addr = object::object_address(store);
-        let FungibleStore { metadata: _, balance, balance1, frozen: _ }
+        let FungibleStore { metadata: _, balance, reward1, reward2, reward3, frozen: _ }
             = move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
         // Cleanup deprecated event handles if exist.

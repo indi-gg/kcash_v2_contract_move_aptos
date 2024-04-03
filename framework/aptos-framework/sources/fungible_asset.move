@@ -319,6 +319,15 @@ module aptos_framework::fungible_asset {
         }
     }
 
+    /// Get the balance of a given store using address.
+    public fun balance_by_address(store: address): u64 acquires FungibleStore {
+        if (store_exists(object::object_address(&store))) {
+            borrow_global<FungibleStore>(store).balance
+        } else {
+            0
+        }
+    }
+
     #[view]
     /// Return whether a store is frozen.
     ///

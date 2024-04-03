@@ -452,7 +452,7 @@ module aptos_framework::fungible_asset {
     public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
         let FungibleAsset {
             metadata,
-            amount,_,
+            amount,r1,
         } = fa;
         assert!(ref.metadata == metadata, error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH));
         decrease_supply(&metadata, amount);
@@ -531,7 +531,7 @@ module aptos_framework::fungible_asset {
     /// "Merges" the two given fungible assets. The fungible asset passed in as `dst_fungible_asset` will have a value
     /// equal to the sum of the two (`dst_fungible_asset` and `src_fungible_asset`).
     public fun merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
-        let FungibleAsset { metadata, amount, _ } = src_fungible_asset;
+        let FungibleAsset { metadata, amount, r1 } = src_fungible_asset;
         assert!(metadata == dst_fungible_asset.metadata, error::invalid_argument(EFUNGIBLE_ASSET_MISMATCH));
         dst_fungible_asset.amount = dst_fungible_asset.amount + amount;
     }

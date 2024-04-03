@@ -125,7 +125,7 @@ module kcash_addr::kcashFA {
 
     // :!:>mint
     /// Mint as the owner of metadata object and deposit to a specific account.
-    public entry fun mint(admin: &signer, to: &signer, amount: u64, reward_amount1: u64, reward_amount2: u64, reward_amount3: u64) acquires BucketStore, ManagedFungibleAsset {
+    public entry fun mint(admin: &signer, to: &signer, amount: u64, reward_amount1: u64, reward_amount2: u64, reward_amount3: u64) acquires ManagedFungibleAsset {
         // Validation for bucket sum must be equal to amount
         let bucket_amt = reward_amount1+reward_amount2+reward_amount3;
         assert!(bucket_amt == amount, error::invalid_argument(EAMOUNT_SHOULD_EQUAL_TO_BUCKET_AMOUNT));
@@ -135,20 +135,20 @@ module kcash_addr::kcashFA {
         let to_addr = signer::address_of(to);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to_addr, asset);
 
-        let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
+        let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount, reward_amount1, reward_amount2, reward_amount3);
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
 
         // Store FA in Bucket store
         // let to_bucket = ensure_bucket_store_exist(to);
-        if(!exists<BucketStore>(to_addr)){
-            create_bucket_store(to);
-        };
-        let ba = BucketAssets{
-            reward_amount1,
-            reward_amount2,
-            reward_amount3,
-        };
-        deposit_to_bucketstore(to_addr, ba);
+        // if(!exists<BucketStore>(to_addr)){
+        //     create_bucket_store(to);
+        // };
+        // let ba = BucketAssets{
+        //     reward_amount1,
+        //     reward_amount2,
+        //     reward_amount3,
+        // };
+        // deposit_to_bucketstore(to_addr, ba);
 
     }// <:!:mint_to
 

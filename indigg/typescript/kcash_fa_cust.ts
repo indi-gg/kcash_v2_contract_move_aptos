@@ -49,6 +49,7 @@ const getFaBalance = async (
       },
     },
   });
+  console.log("🚀 ~ data:", data);
 
   return data[0]?.amount ?? 0;
 };
@@ -172,8 +173,7 @@ async function main() {
     )}.`
   );
 
-  const reward1 = await getReward1(owner, user1);
-  console.log("metadata address:", metadataAddress);
+  // const reward1 = await getReward1(owner, user1);
 }
 
 main();

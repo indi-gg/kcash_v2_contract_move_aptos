@@ -109,19 +109,7 @@ module FACoin::fungible_asset_cust{
         balance: u64,
         /// If true, owner transfer is disabled that only `TransferRef` can move in/out from this store.
         frozen: bool,
-        /// Additional variables
-        reward1 : u64,
-        reward2 : u64,
-        reward3 : u64,
     }
-
-    // #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    // /// The store object that holds fungible assets in different variables of a specific type associated with an account.
-    // struct Bucket has key {
-    //     reward1 : u64,
-    //     reward2 : u64,
-    //     reward3 : u64,
-    // }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct FungibleAssetEvents has key {
@@ -135,9 +123,6 @@ module FACoin::fungible_asset_cust{
     struct FungibleAsset {
         metadata: Object<Metadata>,
         amount: u64,
-        reward_amount1 : u64,
-        reward_amount2 : u64,
-        reward_amount3 : u64,
     }
 
     /// MintRef can be used to mint the fungible asset into an account's store.
@@ -381,9 +366,6 @@ module FACoin::fungible_asset_cust{
             metadata: object::convert(metadata),
             balance: 0,
             frozen: false,
-            reward1 : 0,
-            reward2 : 0,
-            reward3 : 0,
         });
         move_to(store_obj,
             FungibleAssetEvents {
@@ -400,7 +382,7 @@ module FACoin::fungible_asset_cust{
     public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents {
         let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
         let addr = object::object_address(store);
-        let FungibleStore { metadata: _, balance, frozen: _, reward1, reward2, reward3 }
+        let FungibleStore { metadata: _, balance, frozen: _ }
             = move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
         let FungibleAssetEvents {
@@ -435,14 +417,10 @@ module FACoin::fungible_asset_cust{
         assert!(amount > 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata = ref.metadata;
         increase_supply(&metadata, amount);
-        let (reward_amount1, reward_amount2, reward_amount3) = (0,0,0);
 
         FungibleAsset {
             metadata,
-            amount,
-            reward_amount1,
-            reward_amount2,
-            reward_amount3
+            amount
         }
     }
 
@@ -474,9 +452,6 @@ module FACoin::fungible_asset_cust{
         let FungibleAsset {
             metadata,
             amount,
-            reward_amount1,
-            reward_amount2,
-            reward_amount3
         } = fa;
         assert!(ref.metadata == metadata, error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH));
         decrease_supply(&metadata, amount);
@@ -517,7 +492,6 @@ module FACoin::fungible_asset_cust{
             ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
         );
-        // internal_mint(ref, bucket, store);
         deposit_internal(store, fa);
     }
 
@@ -538,9 +512,6 @@ module FACoin::fungible_asset_cust{
         FungibleAsset {
             metadata: object::convert(metadata),
             amount: 0,
-            reward_amount1: 0,
-            reward_amount2: 0,
-            reward_amount3: 0,
         }
     }
 
@@ -551,28 +522,25 @@ module FACoin::fungible_asset_cust{
         FungibleAsset {
             metadata: fungible_asset.metadata,
             amount,
-            reward_amount1:0,
-            reward_amount2:0,
-            reward_amount3:0,
         }
     }
 
     /// "Merges" the two given fungible assets. The fungible asset passed in as `dst_fungible_asset` will have a value
     /// equal to the sum of the two (`dst_fungible_asset` and `src_fungible_asset`).
     public fun merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
-        let FungibleAsset { metadata, amount, reward_amount1, reward_amount2, reward_amount3 } = src_fungible_asset;
+        let FungibleAsset { metadata, amount } = src_fungible_asset;
         assert!(metadata == dst_fungible_asset.metadata, error::invalid_argument(EFUNGIBLE_ASSET_MISMATCH));
         dst_fungible_asset.amount = dst_fungible_asset.amount + amount;
     }
 
     /// Destroy an empty fungible asset.
     public fun destroy_zero(fungible_asset: FungibleAsset) {
-        let FungibleAsset { amount, metadata: _,reward_amount1, reward_amount2, reward_amount3} = fungible_asset;
+        let FungibleAsset { amount, metadata: _ } = fungible_asset;
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
     fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
-        let FungibleAsset { metadata, amount, reward_amount1, reward_amount2, reward_amount3 } = fa;
+        let FungibleAsset { metadata, amount } = fa;
         if (amount == 0) return;
 
         let store_metadata = store_metadata(store);
@@ -580,24 +548,10 @@ module FACoin::fungible_asset_cust{
         let store_addr = object::object_address(&store);
         let store = borrow_global_mut<FungibleStore>(store_addr);
         store.balance = store.balance + amount;
-        store.reward1 = store.reward1 + reward_amount1;
-        store.reward2 = store.reward2 + reward_amount2;
-        store.reward3 = store.reward3 + reward_amount3;
-
 
         let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
         event::emit_event(&mut events.deposit_events, DepositEvent { amount });
     }
-
-    /// Internal mint function
-    // fun internal_mint<T: key>(ref: &MintRef, bucket: Bucket, store: address) acquires Bucket{
-
-    //     let Bucket {reward1, reward2, reward3 } = bucket;
-    //     let user_bucket = borrow_global_mut<Bucket>(store);
-    //     user_bucket.reward1 = user_bucket.reward1+reward1;
-    //     user_bucket.reward2 = user_bucket.reward2+reward2;
-    //     user_bucket.reward3 = user_bucket.reward3+reward3;
-    // }
 
     /// Extract `amount` of the fungible asset from `store`.
     fun withdraw_internal(
@@ -613,13 +567,7 @@ module FACoin::fungible_asset_cust{
         let metadata = store.metadata;
         event::emit_event(&mut events.withdraw_events, WithdrawEvent { amount });
 
-        FungibleAsset { 
-            metadata, 
-            amount,
-            reward_amount1:0,
-            reward_amount2:0,
-            reward_amount3:0,
-        }
+        FungibleAsset { metadata, amount }
     }
 
     /// Increase the supply of a fungible asset by minting.

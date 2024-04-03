@@ -26,6 +26,17 @@ async function getMetadata(admin: Account): Promise<string> {
   return res.inner;
 }
 
+/** Return the Bucket values */
+async function getReward1(admin: Account, user: Account): Promise<string> {
+  const payload: InputViewFunctionData = {
+    function: `${admin.accountAddress}::kcashFA::get_bucket_reward1`,
+    functionArguments: [user.accountAddress],
+  };
+  const res = (await aptos.view<[{ inner: string }]>({ payload }))[0];
+  console.log("🚀 ~ getReward1 ~ res:", res);
+  return res.inner;
+}
+
 const getFaBalance = async (
   owner: Account,
   assetType: string
@@ -160,6 +171,9 @@ async function main() {
       metadataAddress
     )}.`
   );
+
+  const reward1 = await getReward1(owner, user1);
+  console.log("metadata address:", metadataAddress);
 }
 
 main();

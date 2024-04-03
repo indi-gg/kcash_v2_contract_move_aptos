@@ -59,6 +59,37 @@ module kcash_addr::kcashFA {
         });
     }
 
+    /// Deposit to bucketstore
+    fun deposit_to_bucketstore(store_addr: address, ba: BucketAssets) acquires BucketStore{
+        if (!exists<BucketStore>(store_addr)) return;
+        let BucketAssets { reward_amount1, reward_amount2, reward_amount3 } = ba;
+        let store = borrow_global_mut<BucketStore>(store_addr);
+        store.reward1 = store.reward1 + reward_amount1;
+        store.reward2 = store.reward2 + reward_amount2;
+        store.reward3 = store.reward3 + reward_amount3;
+    }
+
+    #[view]
+    /// Return the Bucket values of the user.
+    public fun get_bucket_reward1(store_addr: address): u64 acquires BucketStore{
+        borrow_bucket(store_addr, 1)
+    }
+    #[view]
+    /// Return the Bucket values of the user.
+    public fun get_bucket_reward2(store_addr: address): u64 acquires BucketStore{
+        borrow_bucket(store_addr, 2)
+    }
+    #[view]
+    /// Return the Bucket values of the user.
+    public fun get_bucket_reward3(store_addr: address): u64 acquires BucketStore{
+        borrow_bucket(store_addr, 3)
+    }
+
+    inline fun borrow_bucket(store_addr: address, index: u8): u64 acquires BucketStore{
+        let bs = borrow_global<BucketStore>(store_addr);
+        if(index == 1) bs.reward1 else if (index == 1) bs.reward2 else bs.reward3
+    }
+
     /// Initialize metadata object and store the refs.
     // :!:>initialize
     fun init_module(admin: &signer) {
@@ -90,15 +121,6 @@ module kcash_addr::kcashFA {
     public fun get_metadata(): Object<Metadata> {
         let asset_address = object::create_object_address(&@kcash_addr, ASSET_SYMBOL);
         object::address_to_object<Metadata>(asset_address)
-    }
-
-    fun deposit_to_bucketstore(store_addr: address, ba: BucketAssets) acquires BucketStore{
-        if (!exists<BucketStore>(store_addr)) return;
-        let BucketAssets { reward_amount1, reward_amount2, reward_amount3 } = ba;
-        let store = borrow_global_mut<BucketStore>(store_addr);
-        store.reward1 = store.reward1 + reward_amount1;
-        store.reward2 = store.reward2 + reward_amount2;
-        store.reward3 = store.reward3 + reward_amount3;
     }
 
     // :!:>mint

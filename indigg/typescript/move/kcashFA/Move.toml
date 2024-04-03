@@ -7,6 +7,6 @@ authors = []
 kcash_addr = "_"
 
 [dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-core.git"
+local = "/home/imentus/Documents/kcash_v2_contract_move_aptos"
 rev = "mainnet"
-subdir = "aptos-move/framework/aptos-framework"
+subdir = "/aptos-framework"

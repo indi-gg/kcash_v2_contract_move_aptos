@@ -27,7 +27,7 @@ export function compilePackage(
   const addressArg = namedAddresses.map(({ name, address }) => `${name}=${address}`).join(" ");
 
   // Assume-yes automatically overwrites the previous compiled version, only do this if you are sure you want to overwrite the previous version.
-  const compileCommand = `aptos move build-publish-payload --json-output-file ${outputFile} --package-dir ${packageDir} --named-addresses ${addressArg} --assume-yes`;
+  const compileCommand = `aptos move build-publish-payload --json-output-file ${outputFile} --package-dir ${packageDir} --named-addresses ${addressArg} --assume-yes --skip-fetch-latest-git-deps`;
   console.log("Running the compilation locally, in a real situation you may want to compile this ahead of time.");
   console.log(compileCommand);
   execSync(compileCommand);

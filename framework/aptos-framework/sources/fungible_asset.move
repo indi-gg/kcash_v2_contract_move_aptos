@@ -313,7 +313,7 @@ module aptos_framework::fungible_asset {
     /// Get the balance of a given store.
     public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore {
         if (store_exists(object::object_address(&store))) {
-            borrow_store_resource(&store).balance
+            borrow_store_resource(&store).reward1
         } else {
             10
         }

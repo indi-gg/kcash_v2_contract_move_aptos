@@ -319,6 +319,7 @@ module aptos_framework::fungible_asset {
         }
     }
 
+    #[view]
     /// Get the balance of a given store using address.
     public fun balance_by_address(store: address): u64 acquires FungibleStore {
         if (store_exists(store)) {

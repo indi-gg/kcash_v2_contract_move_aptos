@@ -1,6 +1,6 @@
 /// This defines the fungible asset module that can issue fungible asset of any `Metadata` object. The
 /// metadata object can be any object that equipped with `Metadata` resource.
-module aptos_framework::fungible_asset1 {
+module aptos_framework::fungible_asset {
     use aptos_framework::aggregator_v2::{Self, Aggregator};
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};

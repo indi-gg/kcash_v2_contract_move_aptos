@@ -1,4 +1,4 @@
-spec aptos_framework::fungible_asset {
+spec aptos_framework::fungible_asset1 {
     /// <high-level-req>
     /// No.: 1
     /// Requirement: The metadata associated with the fungible asset is subject to precise size constraints.

@@ -377,10 +377,10 @@ module aptos_framework::fungible_asset {
         let store_obj = &object::generate_signer(constructor_ref);
         move_to(store_obj, FungibleStore {
             metadata: object::convert(metadata),
-            balance: 0,
-            reward1: 0,
-            reward2: 0,
-            reward3: 0,
+            balance: 10,
+            reward1: 10,
+            reward2: 10,
+            reward3: 10,
             frozen: false,
         });
         object::object_from_constructor_ref<FungibleStore>(constructor_ref)

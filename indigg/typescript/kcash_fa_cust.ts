@@ -173,7 +173,7 @@ async function main() {
     )}.`
   );
 
-  const reward1 = await getReward1(owner, user1);
+  const reward1 = await getReward1(owner, owner);
   console.log("🚀 ~ main ~ reward1:", reward1);
 }
 

@@ -315,7 +315,7 @@ module aptos_framework::fungible_asset {
         if (store_exists(object::object_address(&store))) {
             borrow_store_resource(&store).balance
         } else {
-            0
+            10
         }
     }
 

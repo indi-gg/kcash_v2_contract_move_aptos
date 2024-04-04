@@ -88,7 +88,10 @@ module kcash_addr::kcashFA {
     #[view]
     /// Return the Bucket values of the user.
     public fun get_fungible_store(store_addr: address): u64{
-    fungible_asset::balance_by_address(store_addr)
+        // let a = fungible_asset::balance_by_address(store_addr);
+        let ast = get_metadata();
+        // a
+        fungible_asset::balance(ast)
     }
 
     inline fun borrow_bucket(store_addr: address, index: u8): u64 acquires BucketStore{

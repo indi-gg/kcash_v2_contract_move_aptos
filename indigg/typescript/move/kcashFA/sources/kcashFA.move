@@ -2,7 +2,7 @@
 /// deployer will be creating a new managed fungible asset with the hardcoded supply config, name, symbol, and decimals.
 /// The address of the asset can be obtained via get_metadata(). As a simple version, it only deals with primary stores.
 module kcash_addr::kcashFA {
-    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
+    use aptos_framework::fungible_asset1::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
     use std::error;
@@ -88,10 +88,10 @@ module kcash_addr::kcashFA {
     #[view]
     /// Return the Bucket values of the user.
     public fun get_fungible_store(store_addr: address): u64{
-        // let a = fungible_asset::balance_by_address(store_addr);
+        // let a = fungible_asset1::balance_by_address(store_addr);
         let ast = get_metadata();
         // a
-        fungible_asset::balance(ast)
+        fungible_asset1::balance(ast)
     }
 
     inline fun borrow_bucket(store_addr: address, index: u8): u64 acquires BucketStore{
@@ -115,9 +115,9 @@ module kcash_addr::kcashFA {
 
         create_bucket_store(admin);
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
-        let mint_ref = fungible_asset::generate_mint_ref(constructor_ref);
-        let burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
-        let transfer_ref = fungible_asset::generate_transfer_ref(constructor_ref);
+        let mint_ref = fungible_asset1::generate_mint_ref(constructor_ref);
+        let burn_ref = fungible_asset1::generate_burn_ref(constructor_ref);
+        let transfer_ref = fungible_asset1::generate_transfer_ref(constructor_ref);
         let metadata_object_signer = object::generate_signer(constructor_ref);
         move_to(
             &metadata_object_signer,
@@ -146,9 +146,9 @@ module kcash_addr::kcashFA {
         let to_addr = signer::address_of(to);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to_addr, asset);
 
-        // let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount, reward_amount1, reward_amount2, reward_amount3);
-        let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
-        fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
+        // let fa = fungible_asset1::mint(&managed_fungible_asset.mint_ref, amount, reward_amount1, reward_amount2, reward_amount3);
+        let fa = fungible_asset1::mint(&managed_fungible_asset.mint_ref, amount);
+        fungible_asset1::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
 
         // Store FA in Bucket store
         // let to_bucket = ensure_bucket_store_exist(to);
@@ -170,7 +170,7 @@ module kcash_addr::kcashFA {
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
-        fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
+        fungible_asset1::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
 
     /// Burn fungible assets as the owner of metadata object.
@@ -178,7 +178,7 @@ module kcash_addr::kcashFA {
         let asset = get_metadata();
         let burn_ref = &authorized_borrow_refs(admin, asset).burn_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
-        fungible_asset::burn_from(burn_ref, from_wallet, amount);
+        fungible_asset1::burn_from(burn_ref, from_wallet, amount);
     }
 
     /// Freeze an account so it cannot transfer or receive fungible assets.
@@ -186,7 +186,7 @@ module kcash_addr::kcashFA {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, asset);
-        fungible_asset::set_frozen_flag(transfer_ref, wallet, true);
+        fungible_asset1::set_frozen_flag(transfer_ref, wallet, true);
     }
 
     /// Unfreeze an account so it can transfer or receive fungible assets.
@@ -194,7 +194,7 @@ module kcash_addr::kcashFA {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, asset);
-        fungible_asset::set_frozen_flag(transfer_ref, wallet, false);
+        fungible_asset1::set_frozen_flag(transfer_ref, wallet, false);
     }
 
     /// Withdraw as the owner of metadata object ignoring `frozen` field.
@@ -202,7 +202,7 @@ module kcash_addr::kcashFA {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
-        fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
+        fungible_asset1::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
     /// Deposit as the owner of metadata object ignoring `frozen` field.
@@ -210,7 +210,7 @@ module kcash_addr::kcashFA {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
-        fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
+        fungible_asset1::deposit_with_ref(transfer_ref, to_wallet, fa);
     }
 
     /// Borrow the immutable reference of the refs of `metadata`.

@@ -87,11 +87,11 @@ module kcash_addr::kcashFA {
 
     #[view]
     /// Return the Bucket values of the user.
-    public fun get_fungible_store(store_addr: address): u64{
-        // let a = fungible_asset::balance_by_address(store_addr);
-        let ast = get_metadata();
-        // a
-        fungible_asset::balance(ast)
+    public fun get_fungible_store(store_addr: address): bool{
+        // // let a = fungible_asset::balance_by_address(store_addr);
+        // let ast = get_metadata();
+        // // a
+        fungible_asset::store_exists(store_addr)
     }
 
     inline fun borrow_bucket(store_addr: address, index: u8): u64 acquires BucketStore{
@@ -136,15 +136,14 @@ module kcash_addr::kcashFA {
 
     // :!:>mint
     /// Mint as the owner of metadata object and deposit to a specific account.
-    public entry fun mint(admin: &signer, to: &signer, amount: u64, reward_amount1: u64, reward_amount2: u64, reward_amount3: u64) acquires ManagedFungibleAsset {
+    public entry fun mint(admin: &signer, to: address, amount: u64, reward_amount1: u64, reward_amount2: u64, reward_amount3: u64) acquires ManagedFungibleAsset {
         // Validation for bucket sum must be equal to amount
         let bucket_amt = reward_amount1+reward_amount2+reward_amount3;
         assert!(bucket_amt == amount, error::invalid_argument(EAMOUNT_SHOULD_EQUAL_TO_BUCKET_AMOUNT));
 
         let asset = get_metadata();
         let managed_fungible_asset = authorized_borrow_refs(admin, asset);
-        let to_addr = signer::address_of(to);
-        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to_addr, asset);
+        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
 
         // let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount, reward_amount1, reward_amount2, reward_amount3);
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);

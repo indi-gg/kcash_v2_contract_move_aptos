@@ -59,6 +59,30 @@ async function deployModule(owner: Account, metadataBytes: any, byteCode: any) {
 }
 
 /** Admin mint the newly created coin to the specified receiver address */
+async function increaseCounter(admin: Account): Promise<string> {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${owner.accountAddress}::demo_counter::increment`,
+      functionArguments: [owner.accountAddress],
+    },
+  });
+
+  const senderAuthenticator = aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
+  });
+
+  await aptos.waitForTransaction({
+    transactionHash: pendingTxn.hash,
+  });
+  return pendingTxn.hash;
+}
+/** Admin mint the newly created coin to the specified receiver address */
 async function publishCounter(admin: Account, i: AnyNumber): Promise<string> {
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
@@ -116,11 +140,17 @@ async function main() {
 
   // console.log(`Transaction hash2: ${txHash}`);
 
-  let publishTx = await publishCounter(user1, 1);
-  console.log("🚀 ~ main ~ publishTx:", publishTx);
+  // let publishTx = await publishCounter(owner, 1);
+  // console.log("🚀 ~ main ~ publishTx:", publishTx);
 
   let countTx = await getCounter(owner.accountAddress);
   console.log("🚀 ~ main ~ countTx:", countTx);
+
+  let inc = await increaseCounter(user1);
+  console.log("🚀 ~ main ~ inc:", inc);
+
+  let new_countTx = await getCounter(owner.accountAddress);
+  console.log("🚀 ~ main ~ new_countTx:", new_countTx);
 }
 
 main();

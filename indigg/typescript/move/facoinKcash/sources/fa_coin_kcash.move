@@ -38,7 +38,7 @@ module FACoinAddr::fa_coin_kcash {
         reward3: u64,
     }
 
-    struct BucketStore has key, drop, copy{
+    struct BucketStore has key, copy{
         data: vector<BucketMap>,
     }
 

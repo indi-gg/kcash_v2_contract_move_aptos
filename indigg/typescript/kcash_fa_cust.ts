@@ -125,7 +125,7 @@ async function getMetadata(admin: Account): Promise<string> {
 async function getBucketValues(admin: Account) {
   try {
     const payload: InputViewFunctionData = {
-      function: `${admin.accountAddress}::${module_name}::getRewards`,
+      function: `${admin.accountAddress}::${module_name}::length`,
       functionArguments: [admin.accountAddress.toString()],
     };
     const res = (await aptos.view<[{data: []}]>({ payload }))[0];
@@ -137,33 +137,33 @@ async function getBucketValues(admin: Account) {
 }
 
 async function main() {
-  // console.log("\n=== Compiling KCash package locally ===");
-  // let tx = await compileAndDeployModule(
-  //   module_file_name,
-  //   output_file_path,
-  //   address_name,
-  //   owner.accountAddress
-  // );
-  // console.log("🚀 ~ main ~ tx:", tx);
+  console.log("\n=== Compiling KCash package locally ===");
+  let tx = await compileAndDeployModule(
+    module_file_name,
+    output_file_path,
+    address_name,
+    owner.accountAddress
+  );
+  console.log("🚀 ~ main ~ tx:", tx);
 
-  // const metadataAddress = await getMetadata(owner);
-  // console.log("metadata address:", metadataAddress);
+  const metadataAddress = await getMetadata(owner);
+  console.log("metadata address:", metadataAddress);
 
-  // let user_balance = await getFaBalance(owner.accountAddress, metadataAddress);
-  // console.log("🚀 ~ main ~ user_balance:", user_balance);
+  let user_balance = await getFaBalance(owner.accountAddress, metadataAddress);
+  console.log("🚀 ~ main ~ user_balance:", user_balance);
 
-  // let mintTx = await mintCoin(
-  //   owner,
-  //   user.accountAddress,
-  //   100000000000000000n,
-  //   50000000000000000n,
-  //   30000000000000000n,
-  //   20000000000000000n
-  // );
-  // console.log("🚀 ~ main ~ mintTx:", mintTx);
+  let mintTx = await mintCoin(
+    owner,
+    user.accountAddress,
+    100000000000000000n,
+    50000000000000000n,
+    30000000000000000n,
+    20000000000000000n
+  );
+  console.log("🚀 ~ main ~ mintTx:", mintTx);
 
-  // let user_balance2 = await getFaBalance(user.accountAddress, metadataAddress);
-  // console.log("🚀 ~ main ~ user_balance:", user_balance2);
+  let user_balance2 = await getFaBalance(user.accountAddress, metadataAddress);
+  console.log("🚀 ~ main ~ user_balance:", user_balance2);
   
   let bucketValues = await getBucketValues(owner);
   console.log("🚀 ~ main ~ bucketValues:", bucketValues);

@@ -143,6 +143,7 @@ module aptos_framework::fungible_asset {
     struct Deposit has drop, store {
         store: address,
         amount: u64,
+        reward1: u64,
     }
 
     #[event]
@@ -548,7 +549,7 @@ module aptos_framework::fungible_asset {
 
     /// Destroy an empty fungible asset.
     public fun destroy_zero(fungible_asset: FungibleAsset) {
-        let FungibleAsset { amount, metadata: _, r1 } = fungible_asset;
+        let FungibleAsset { amount, metadata: _, _ } = fungible_asset;
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
@@ -563,7 +564,7 @@ module aptos_framework::fungible_asset {
         store.balance = store.balance + amount;
         store.reward1 = store.reward1 + r1;
 
-        event::emit<Deposit>(Deposit { store: store_addr, amount });
+        event::emit<Deposit>(Deposit { store: store_addr, amount, reward1, r1 });
     }
 
     /// Extract `amount` of the fungible asset from `store`.

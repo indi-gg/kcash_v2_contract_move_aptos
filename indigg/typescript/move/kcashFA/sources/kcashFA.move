@@ -25,65 +25,49 @@ module kcash_addr::kcashFA {
         burn_ref: BurnRef,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// The BucketStore object that holds fungible assets of differentc type associated with an account.
-    struct BucketStore has key {
-        reward1: u64,
-        reward2: u64,
-        reward3: u64,
-    }
+    // #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    // /// The BucketStore object that holds fungible assets of differentc type associated with an account.
+    // struct BucketStore has key {
+    //     reward1: u64,
+    //     reward2: u64,
+    //     reward3: u64,
+    // }
 
     /// BucketAssets can be passed into function for type safety and to guarantee a specific amount.
     /// BucketAssets is ephemeral and cannot be stored directly. It must be deposited back into a Bucketstore.
-    struct BucketAssets has drop {
-        reward_amount1: u64,
-        reward_amount2: u64,
-        reward_amount3: u64,
-    }
+    // struct BucketAssets has drop {
+    //     reward_amount1: u64,
+    //     reward_amount2: u64,
+    //     reward_amount3: u64,
+    // }
 
-    #[view]
-    /// Return whether the provided address has a store initialized.
-    public fun bucket_exists(store: address): bool {
-        exists<BucketStore>(store)
-    }
+    // #[view]
+    // /// Return whether the provided address has a store initialized.
+    // public fun bucket_exists(store: address): bool {
+    //     exists<BucketStore>(store)
+    // }
 
     /// Allow an object to hold a store for fungible assets.
     /// Applications can use this to create multiple stores for isolating fungible assets for different purposes.
-    fun create_bucket_store(
-        store_obj: &signer
-    ){
-        move_to(store_obj, BucketStore {
-            reward1: 0,
-            reward2: 0,
-            reward3: 0,
-        });
-    }
+    // fun create_bucket_store(
+    //     store_obj: &signer
+    // ){
+    //     move_to(store_obj, BucketStore {
+    //         reward1: 0,
+    //         reward2: 0,
+    //         reward3: 0,
+    //     });
+    // }
 
     /// Deposit to bucketstore
-    fun deposit_to_bucketstore(store_addr: address, ba: BucketAssets) acquires BucketStore{
-        if (!exists<BucketStore>(store_addr)) return;
-        let BucketAssets { reward_amount1, reward_amount2, reward_amount3 } = ba;
-        let store = borrow_global_mut<BucketStore>(store_addr);
-        store.reward1 = store.reward1 + reward_amount1;
-        store.reward2 = store.reward2 + reward_amount2;
-        store.reward3 = store.reward3 + reward_amount3;
-    }
-
-    #[view]
-    /// Return the Bucket values of the user.
-    public fun get_bucket_reward1(store_addr: address): u64 acquires BucketStore{
-        borrow_bucket(store_addr, 1)
-    }
-    #[view]
-    /// Return the Bucket values of the user.
-    public fun get_bucket_reward2(store_addr: address): u64 acquires BucketStore{
-        borrow_bucket(store_addr, 2)
-    }
-    #[view]
-    /// Return the Bucket values of the user.
-    public fun get_bucket_reward3(store_addr: address): u64 acquires BucketStore{
-        borrow_bucket(store_addr, 3)
-    }
+    // fun deposit_to_bucketstore(store_addr: address, ba: BucketAssets) acquires BucketStore{
+    //     if (!exists<BucketStore>(store_addr)) return;
+    //     let BucketAssets { reward_amount1, reward_amount2, reward_amount3 } = ba;
+    //     let store = borrow_global_mut<BucketStore>(store_addr);
+    //     store.reward1 = store.reward1 + reward_amount1;
+    //     store.reward2 = store.reward2 + reward_amount2;
+    //     store.reward3 = store.reward3 + reward_amount3;
+    // }
 
     #[view]
     /// Return the Bucket values of the user.
@@ -92,11 +76,6 @@ module kcash_addr::kcashFA {
         let ast = get_metadata();
         // a
         fungible_asset::balance(ast)
-    }
-
-    inline fun borrow_bucket(store_addr: address, index: u8): u64 acquires BucketStore{
-        let bs = borrow_global<BucketStore>(store_addr);
-        if(index == 1) bs.reward1 else if (index == 1) bs.reward2 else bs.reward3
     }
 
     /// Initialize metadata object and store the refs.
@@ -113,7 +92,7 @@ module kcash_addr::kcashFA {
             utf8(b"http://example.com"), /* project */
         );
 
-        create_bucket_store(admin);
+        // create_bucket_store(admin);
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
         let mint_ref = fungible_asset::generate_mint_ref(constructor_ref);
         let burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
@@ -149,18 +128,6 @@ module kcash_addr::kcashFA {
         // let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount, reward_amount1, reward_amount2, reward_amount3);
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
-
-        // Store FA in Bucket store
-        // let to_bucket = ensure_bucket_store_exist(to);
-        // if(!exists<BucketStore>(to_addr)){
-        //     create_bucket_store(to);
-        // };
-        // let ba = BucketAssets{
-        //     reward_amount1,
-        //     reward_amount2,
-        //     reward_amount3,
-        // };
-        // deposit_to_bucketstore(to_addr, ba);
 
     }// <:!:mint_to
 

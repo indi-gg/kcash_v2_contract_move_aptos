@@ -143,15 +143,6 @@ async function main() {
       metadataAddress
     )}.`
   );
-  // console.log(
-  //   `User1's initial KCash balance: ${await getFaBalance(
-  //     user1,
-  //     metadataAddress
-  //   )}.`
-  // );
-  // console.log(
-  //   `User2's initial balance: ${await getFaBalance(user2, metadataAddress)}.`
-  // );
 
   console.log("Owner mints ");
   const mintCoinTransactionHash = await mintCoin(

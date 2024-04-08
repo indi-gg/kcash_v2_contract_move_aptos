@@ -143,6 +143,7 @@ module aptos_framework::fungible_asset {
     struct Deposit has drop, store {
         store: address,
         amount: u64,
+        reward1: u64,
     }
 
     #[event]
@@ -313,7 +314,7 @@ module aptos_framework::fungible_asset {
     /// Get the balance of a given store.
     public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore {
         if (store_exists(object::object_address(&store))) {
-            borrow_store_resource(&store).balance
+            borrow_store_resource(&store).reward1
         } else {
             10
         }
@@ -563,7 +564,7 @@ module aptos_framework::fungible_asset {
         store.balance = store.balance + amount;
         store.reward1 = store.reward1 + r1;
 
-        event::emit<Deposit>(Deposit { store: store_addr, amount });
+        event::emit<Deposit>(Deposit { store: store_addr, amount, reward1: r1 });
     }
 
     /// Extract `amount` of the fungible asset from `store`.

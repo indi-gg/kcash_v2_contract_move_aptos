@@ -45,7 +45,7 @@ const privateKeyuser = new Ed25519PrivateKey(user_kp.privateKey);
 const user1 = Account.fromPrivateKey({ privateKey: privateKeyuser });
 
 /** Admin forcefully transfers the newly created coin to the specified receiver address */
-async function transferCoin(
+async function customTransfer(
   admin: Account,
   fromAddress: AccountAddress,
   toAddress: AccountAddress,
@@ -69,6 +69,42 @@ async function transferCoin(
   });
 
   return pendingTxn.hash;
+}
+
+// User transfer the funds
+async function nativeTransfer(
+  sender: Account,
+  metadata: AccountAddress,
+  receiver: AccountAddress,
+  amount: AnyNumber
+) {
+  try {
+    let tx = await aptos.transferFungibleAsset({
+      sender: sender,
+      fungibleAssetMetadataAddress: metadata,
+      recipient: receiver,
+      amount: amount,
+    });
+
+    const senderAuthenticator = await aptos.transaction.sign({
+      signer: sender,
+      transaction: tx,
+    });
+
+    const transferTx = await aptos.transaction.submit.simple({
+      transaction: tx,
+      senderAuthenticator,
+    });
+    await aptos.waitForTransaction({
+      transactionHash: transferTx.hash,
+    });
+    console.log("🚀 ~ transferTx:", transferTx.hash);
+
+    return transferTx.hash;
+  } catch (error) {
+    // console.log("🚀 ~ error:", error);
+    return false;
+  }
 }
 
 /** Admin mint the newly created coin to the specified receiver address */
@@ -190,19 +226,19 @@ const getFaBalance = async (
 };
 
 /** Return the address of the managed fungible asset that's created when this module is deployed */
-async function getMetadata(admin: Account): Promise<string> {
+async function getMetadata(admin: Account) {
   const payload: InputViewFunctionData = {
     function: `${admin.accountAddress}::fa_coin::get_metadata`,
     functionArguments: [],
   };
-  const res = (await aptos.view<[{ inner: string }]>({ payload }))[0];
+  const res = (await aptos.view<[{ inner: AccountAddress }]>({ payload }))[0];
+  console.log("🚀 ~ getMetadata ~ res:", res);
   return res.inner;
 }
 
 async function main() {
-
   const privateKeyUser2 = new Ed25519PrivateKey(
-    "0x1983c113a674948c187d3132ce0a8718b4e63eb1e2ca49bb132a291dc88bdf4c"
+    "0xd9c1d14c0c87920367d07c26888be311f7bd879971437130a865d0ae8f080b15"
   );
   const user2 = Account.fromPrivateKey({ privateKey: privateKeyUser2 });
 
@@ -230,12 +266,13 @@ async function main() {
     signer: owner,
     transaction,
   });
-  console.log(`Transaction hash: ${response.hash}`);
   await aptos.waitForTransaction({
     transactionHash: response.hash,
   });
+  console.log(`Transaction hash: ${response.hash}`);
 
-  const metadataAddress = await getMetadata(owner);
+  const metadata = await getMetadata(owner);
+  let metadataAddress = metadata.toString();
   console.log("metadata address:", metadataAddress);
 
   console.log(
@@ -262,8 +299,31 @@ async function main() {
   );
 
   await aptos.waitForTransaction({ transactionHash: mintCoinTransactionHash });
+  console.log("🚀 ~ main ~ mint trx hash:", mintCoinTransactionHash);
+
   console.log(
-    `User2's updated KCash primary fungible store balance: ${await getFaBalance(
+    `User1's updated KCash primary fungible store balance: ${await getFaBalance(
+      user1,
+      metadataAddress
+    )}.`
+  );
+
+  console.log(
+    "--------Now try to transfer the funds using native transfer method-------------"
+  );
+  console.log("Transfer amount: ", 100000000000000);
+
+  let ntx = await nativeTransfer(
+    user1,
+    metadata,
+    user2.accountAddress,
+    100000000000000
+  );
+
+  console.log("Native tx hash: ", ntx);
+
+  console.log(
+    `User1's updated KCash balance After native transfer: ${await getFaBalance(
       user1,
       metadataAddress
     )}.`
@@ -272,6 +332,37 @@ async function main() {
   console.log("Owner freezes User1's account.");
   const freezeTransactionHash = await freeze(owner, user1.accountAddress);
   await aptos.waitForTransaction({ transactionHash: freezeTransactionHash });
+  console.log("🚀 ~ main ~ freezed Transaction Hash:", freezeTransactionHash);
+
+  console.log("Check if we can transfer funds after freezing the account");
+
+  let ntx2 = await nativeTransfer(
+    user1,
+    metadata,
+    user2.accountAddress,
+    100000000000000
+  );
+  console.log("🚀 ~ main ~ ntx2:", ntx2);
+  if (!ntx2) {
+    console.log("Can not transfer the funds");
+
+    console.log(
+      "Now try to transfer 100000000000000 via our module transfer method"
+    );
+    let ctx = await customTransfer(
+      owner,
+      user1.accountAddress,
+      user2.accountAddress,
+      100000000000000
+    );
+    console.log("🚀 ~ main ~ ctx:", ctx);
+    console.log(
+      `User1's updated KCash balance After custom transfer: ${await getFaBalance(
+        user1,
+        metadataAddress
+      )}.`
+    );
+  }
 
   console.log("done.");
 }

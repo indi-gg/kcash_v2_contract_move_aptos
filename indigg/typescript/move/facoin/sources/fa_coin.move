@@ -68,9 +68,13 @@ module FACoin::fa_coin {
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
 
         //pupulate bucket props
-        
-
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
+
+        // Freeeze the account
+        let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
+        let wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
+        fungible_asset::set_frozen_flag(transfer_ref, wallet, true);
+
     }// <:!:mint_to
 
     /// Transfer as the owner of metadata object ignoring `frozen` field.

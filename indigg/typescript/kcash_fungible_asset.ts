@@ -45,7 +45,7 @@ const privateKeyuser = new Ed25519PrivateKey(user_kp.privateKey);
 const user1 = Account.fromPrivateKey({ privateKey: privateKeyuser });
 
 /** Admin forcefully transfers the newly created coin to the specified receiver address */
-async function customTransfer(
+async function transfer(
   admin: Account,
   fromAddress: AccountAddress,
   toAddress: AccountAddress,
@@ -349,7 +349,7 @@ async function main() {
     console.log(
       "Now try to transfer 100000000000000 via our module transfer method"
     );
-    let ctx = await customTransfer(
+    let ctx = await transfer(
       owner,
       user1.accountAddress,
       user2.accountAddress,

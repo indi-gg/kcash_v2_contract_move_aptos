@@ -3,7 +3,6 @@
 /// The address of the asset can be obtained via get_metadata(). As a simple version, it only deals with primary stores.
 module FACoin::fa_coin {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
-    // use FACoin::fungible_asset_cust::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
     use std::error;

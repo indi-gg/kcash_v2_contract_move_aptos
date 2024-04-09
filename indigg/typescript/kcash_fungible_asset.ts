@@ -111,13 +111,22 @@ async function nativeTransfer(
 async function mintCoin(
   admin: Account,
   receiver: Account,
-  amount: AnyNumber
+  amount: AnyNumber,
+  reward1: AnyNumber,
+  reward2: AnyNumber,
+  reward3: AnyNumber
 ): Promise<string> {
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
       function: `${admin.accountAddress}::fa_coin::mint`,
-      functionArguments: [receiver.accountAddress, amount],
+      functionArguments: [
+        receiver.accountAddress,
+        amount,
+        reward1,
+        reward2,
+        reward3,
+      ],
     },
   });
 
@@ -236,6 +245,26 @@ async function getMetadata(admin: Account) {
   return res.inner;
 }
 
+async function hasBucket(admin: Account) {
+  const payload: InputViewFunctionData = {
+    function: `${admin.accountAddress}::fa_coin::has_bucket_store`,
+    functionArguments: [admin.accountAddress],
+  };
+  const res = (await aptos.view({ payload }))[0];
+  console.log("🚀 ~ hasBucket ~ res:", res);
+  return res;
+}
+
+async function getBucketStore(admin: Account) {
+  const payload: InputViewFunctionData = {
+    function: `${owner.accountAddress}::fa_coin::get_bucket_store`,
+    functionArguments: [admin.accountAddress],
+  };
+  const res = (await aptos.view({ payload }));
+  console.log("🚀 ~ hasBucket ~ res:", res);
+  return res;
+}
+
 async function main() {
   const privateKeyUser2 = new Ed25519PrivateKey(
     "0xd9c1d14c0c87920367d07c26888be311f7bd879971437130a865d0ae8f080b15"
@@ -295,7 +324,10 @@ async function main() {
   const mintCoinTransactionHash = await mintCoin(
     owner,
     user1,
-    100000000000000000
+    100000000000000000n,
+    50000000000000000n,
+    30000000000000000n,
+    20000000000000000n
   );
 
   await aptos.waitForTransaction({ transactionHash: mintCoinTransactionHash });
@@ -308,61 +340,64 @@ async function main() {
     )}.`
   );
 
-  console.log(
-    "--------Now try to transfer the funds using native transfer method-------------"
-  );
-  console.log("Transfer amount: ", 100000000000000);
+  let bs = await getBucketStore(user1);
+  console.log("🚀 ~ main ~ bs:", bs)
 
-  let ntx = await nativeTransfer(
-    user1,
-    metadata,
-    user2.accountAddress,
-    100000000000000
-  );
+  // console.log(
+  //   "--------Now try to transfer the funds using native transfer method-------------"
+  // );
+  // console.log("Transfer amount: ", 100000000000000);
 
-  console.log("Native tx hash: ", ntx);
+  // let ntx = await nativeTransfer(
+  //   user1,
+  //   metadata,
+  //   user2.accountAddress,
+  //   100000000000000
+  // );
 
-  console.log(
-    `User1's updated KCash balance After native transfer: ${await getFaBalance(
-      user1,
-      metadataAddress
-    )}.`
-  );
+  // console.log("Native tx hash: ", ntx);
 
-  console.log("Owner freezes User1's account.");
-  const freezeTransactionHash = await freeze(owner, user1.accountAddress);
-  await aptos.waitForTransaction({ transactionHash: freezeTransactionHash });
-  console.log("🚀 ~ main ~ freezed Transaction Hash:", freezeTransactionHash);
+  // console.log(
+  //   `User1's updated KCash balance After native transfer: ${await getFaBalance(
+  //     user1,
+  //     metadataAddress
+  //   )}.`
+  // );
 
-  console.log("Check if we can transfer funds after freezing the account");
+  // console.log("Owner freezes User1's account.");
+  // const freezeTransactionHash = await freeze(owner, user1.accountAddress);
+  // await aptos.waitForTransaction({ transactionHash: freezeTransactionHash });
+  // console.log("🚀 ~ main ~ freezed Transaction Hash:", freezeTransactionHash);
 
-  let ntx2 = await nativeTransfer(
-    user1,
-    metadata,
-    user2.accountAddress,
-    100000000000000
-  );
-  console.log("🚀 ~ main ~ ntx2:", ntx2);
-  if (!ntx2) {
-    console.log("Can not transfer the funds");
+  // console.log("Check if we can transfer funds after freezing the account");
 
-    console.log(
-      "Now try to transfer 100000000000000 via our module transfer method"
-    );
-    let ctx = await transfer(
-      owner,
-      user1.accountAddress,
-      user2.accountAddress,
-      100000000000000
-    );
-    console.log("🚀 ~ main ~ ctx:", ctx);
-    console.log(
-      `User1's updated KCash balance After custom transfer: ${await getFaBalance(
-        user1,
-        metadataAddress
-      )}.`
-    );
-  }
+  // let ntx2 = await nativeTransfer(
+  //   user1,
+  //   metadata,
+  //   user2.accountAddress,
+  //   100000000000000
+  // );
+  // console.log("🚀 ~ main ~ ntx2:", ntx2);
+  // if (!ntx2) {
+  //   console.log("Can not transfer the funds");
+
+  //   console.log(
+  //     "Now try to transfer 100000000000000 via our module transfer method"
+  //   );
+  //   let ctx = await transfer(
+  //     owner,
+  //     user1.accountAddress,
+  //     user2.accountAddress,
+  //     100000000000000
+  //   );
+  //   console.log("🚀 ~ main ~ ctx:", ctx);
+  //   console.log(
+  //     `User1's updated KCash balance After custom transfer: ${await getFaBalance(
+  //       user1,
+  //       metadataAddress
+  //     )}.`
+  //   );
+  // }
 
   console.log("done.");
 }

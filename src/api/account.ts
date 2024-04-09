@@ -65,7 +65,7 @@ export class Account {
    * }
    * ```
    */
-  async getAccountInfo(args: { accountAddress: AccountAddressInput }): Promise<AccountData> {
+    async getAccountInfo(args: { accountAddress: AccountAddressInput }): Promise<AccountData> {
     return getInfo({ aptosConfig: this.config, ...args });
   }
 

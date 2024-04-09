@@ -47,7 +47,7 @@ const privateKeyuser = new Ed25519PrivateKey(user_kp.privateKey);
 const user1 = Account.fromPrivateKey({ privateKey: privateKeyuser });
 
 /** Admin forcefully transfers the newly created coin to the specified receiver address */
-export async function transferCoin(
+async function transfer(
   admin: Account,
   fromAddress: AccountAddress,
   toAddress: AccountAddress,
@@ -73,72 +73,76 @@ export async function transferCoin(
   return pendingTxn.hash;
 }
 
-/** Admin mint the newly created coin to the specified receiver address */
-// async function mintCoin(
-//   admin: Account,
-//   receiver: Account,
-//   amount: AnyNumber
-// ): Promise<string> {
-//   const transaction = await aptos.transaction.build.simple({
-//     sender: admin.accountAddress,
-//     data: {
-//       function: `${admin.accountAddress}::fa_coin::mint`,
-//       functionArguments: [receiver.accountAddress, amount],
-//     },
-//   });
-
-//   const senderAuthenticator = await aptos.transaction.sign({
-//     signer: admin,
-//     transaction,
-//   });
-//   const pendingTxn = await aptos.transaction.submit.simple({
-//     transaction,
-//     senderAuthenticator,
-//   });
-
-//   return pendingTxn.hash;
-// }
-
-export async function mintCoin(owner: Account, receiver: Account, amount: AnyNumber): Promise<string> {
-  console.log(`71111Request received to mint ${amount} coins for receiver ${receiver.accountAddress} by admin ${owner.accountAddress}`);
-// console.log(`${receiver},${owner}`);
-// console.log("admin74",typeof owner.accountAddress.toString());
-// console.log("admin.accountAddress.toString()",owner.accountAddress.toString());
-
-  // console.time("mintCoin"); // Start the timer
-
+// User transfer the funds
+async function nativeTransfer(
+  sender: Account,
+  metadata: AccountAddress,
+  receiver: AccountAddress,
+  amount: AnyNumber
+) {
   try {
-    // const senderAddress: string = admin.accountAddress.toString(); // Convert admin account address to string
-    const transaction = await aptos.transaction.build.simple({
-      sender: owner.accountAddress,
-      data: {
-        function: `${owner.accountAddress}::fa_coin::mint`,
-        functionArguments: [receiver.accountAddress, amount],
-      },
+    let tx = await aptos.transferFungibleAsset({
+      sender: sender,
+      fungibleAssetMetadataAddress: metadata,
+      recipient: receiver,
+      amount: amount,
     });
-  // console.log("transaction88",transaction);
-  
-    const senderAuthenticator =  aptos.transaction.sign({ signer: owner, transaction });
-    // console.log("senderAuthenticator91",senderAuthenticator);
-    
-    const pendingTxn = await aptos.transaction.submit.simple({ transaction, senderAuthenticator });
-    console.log("pendingTxn96",pendingTxn);
-    
-    // console.timeEnd("mintCoin"); // End the timer and log the elapsed time
 
-    return pendingTxn.hash;
+    const senderAuthenticator = await aptos.transaction.sign({
+      signer: sender,
+      transaction: tx,
+    });
+
+    const transferTx = await aptos.transaction.submit.simple({
+      transaction: tx,
+      senderAuthenticator,
+    });
+    await aptos.waitForTransaction({
+      transactionHash: transferTx.hash,
+    });
+    console.log("🚀 ~ transferTx:", transferTx.hash);
+
+    return transferTx.hash;
   } catch (error) {
-    console.log("An error occurred while minting coins:", error);
-    throw error;
+    // console.log("🚀 ~ error:", error);
+    return false;
   }
 }
 
+/** Admin mint the newly created coin to the specified receiver address */
+async function mintCoin(
+  admin: Account,
+  receiver: Account,
+  amount: AnyNumber,
+  reward1: AnyNumber,
+  reward2: AnyNumber,
+  reward3: AnyNumber
+): Promise<string> {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${admin.accountAddress}::fa_coin::mint`,
+      functionArguments: [
+        receiver.accountAddress,
+        amount,
+        reward1,
+        reward2,
+        reward3,
+      ],
+    },
+  });
 
+  const senderAuthenticator = await aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
+  });
 
-
-
-
-
+  return pendingTxn.hash;
+}
 
 export async function burnCoin(admin: Account, fromAddress: AccountAddress, amount: AnyNumber): Promise<string> {
   try {
@@ -237,32 +241,40 @@ export const getFaBalance = async (owner: Account, assetType: string): Promise<n
   }
 };
 
-
-export async function getMetadata(admin: Account): Promise<string> {
-  // console.log(`Request for metadata for admin account ${admin} received.`);
-
+/** Return the address of the managed fungible asset that's created when this module is deployed */
+async function getMetadata(admin: Account) {
   const payload: InputViewFunctionData = {
     function: `${admin.accountAddress}::fa_coin::get_metadata`,
     functionArguments: [],
   };
-  
-  try {
-    const res = (await aptos.view<[{ inner: string }]>({ payload }))[0];
-    // console.log(`Metadata retrieved successfully:`, res);
-    return res.inner;
-  } catch (error) {
-    // console.log(`Error while retrieving metadata:`, error);
-    throw error; // Rethrow the error to handle it at the caller's level if needed
-  }
+  const res = (await aptos.view<[{ inner: AccountAddress }]>({ payload }))[0];
+  console.log("🚀 ~ getMetadata ~ res:", res);
+  return res.inner;
 }
 
+async function hasBucket(admin: Account) {
+  const payload: InputViewFunctionData = {
+    function: `${admin.accountAddress}::fa_coin::has_bucket_store`,
+    functionArguments: [admin.accountAddress],
+  };
+  const res = (await aptos.view({ payload }))[0];
+  console.log("🚀 ~ hasBucket ~ res:", res);
+  return res;
+}
+
+async function getBucketStore(admin: Account) {
+  const payload: InputViewFunctionData = {
+    function: `${owner.accountAddress}::fa_coin::get_bucket_store`,
+    functionArguments: [admin.accountAddress],
+  };
+  const res = (await aptos.view({ payload }));
+  console.log("🚀 ~ hasBucket ~ res:", res);
+  return res;
+}
 
 async function main() {
-  let privateKeyOwner = new Ed25519PrivateKey("0xfa5a4197c79ba2ff77e12a70047469effd01cd2a6affdfb9cff6cb2147801f4a");
-  let owner = Account.fromPrivateKey({ privateKey:privateKeyOwner });
-
   const privateKeyUser2 = new Ed25519PrivateKey(
-    "0x1983c113a674948c187d3132ce0a8718b4e63eb1e2ca49bb132a291dc88bdf4c"
+    "0xd9c1d14c0c87920367d07c26888be311f7bd879971437130a865d0ae8f080b15"
   );
   const user2 = Account.fromPrivateKey({ privateKey: privateKeyUser2 });
 
@@ -293,39 +305,97 @@ async function main() {
   await aptos.waitForTransaction({
     transactionHash: response.hash,
   });
-  console.log(`Transaction hash28000: ${response.hash}`);
+  console.log(`Transaction hash: ${response.hash}`);
 
-     let metadataAddress = await getMetadata(owner);
-     let metadataAddress1 = await getMetadata(user1);
+  const metadata = await getMetadata(owner);
+  let metadataAddress = metadata.toString();
+  console.log("metadata address:", metadataAddress);
 
   
    console.log("metadata address:", metadataAddress);
 
   console.log("All the balances in this exmaple refer to balance in primary fungible stores of each account.");
    console.log(`Owner's initial KCash balance: ${await getFaBalance(owner, metadataAddress)}.`);
-  console.log(`User1's initial KCash balance: ${await getFaBalance(user1, metadataAddress1)}.`);
   console.log(`User2's initial balance: ${await getFaBalance(user2, metadataAddress)}.`);
 
   console.log("Owner mints Owner 1000000000 coins.");
-
-  console.log("owner287",owner);
-  let mintCoinTransactionHash = await mintCoin(owner, user1, 100000000000000000);
-    console.log("mintCoinTransactionHash295",mintCoinTransactionHash);
-     
-     
-console.log("mintCoinTransactionHash",mintCoinTransactionHash);
+  const mintCoinTransactionHash = await mintCoin(
+    owner,
+    user1,
+    100000000000000000n,
+    50000000000000000n,
+    30000000000000000n,
+    20000000000000000n
+  );
 
   await aptos.waitForTransaction({ transactionHash: mintCoinTransactionHash });
+  console.log("🚀 ~ main ~ mint trx hash:", mintCoinTransactionHash);
+
   console.log(
-    `User2's updated KCash primary fungible store balance: ${await getFaBalance(
+    `User1's updated KCash primary fungible store balance: ${await getFaBalance(
       user1,
       metadataAddress
     )}.`
   );
 
-  console.log("Owner freezes User1's account.");
-  const freezeTransactionHash = await freeze(owner, user1.accountAddress);
-  await aptos.waitForTransaction({ transactionHash: freezeTransactionHash });
+  let bs = await getBucketStore(user1);
+  console.log("🚀 ~ main ~ bs:", bs)
+
+  // console.log(
+  //   "--------Now try to transfer the funds using native transfer method-------------"
+  // );
+  // console.log("Transfer amount: ", 100000000000000);
+
+  // let ntx = await nativeTransfer(
+  //   user1,
+  //   metadata,
+  //   user2.accountAddress,
+  //   100000000000000
+  // );
+
+  // console.log("Native tx hash: ", ntx);
+
+  // console.log(
+  //   `User1's updated KCash balance After native transfer: ${await getFaBalance(
+  //     user1,
+  //     metadataAddress
+  //   )}.`
+  // );
+
+  // console.log("Owner freezes User1's account.");
+  // const freezeTransactionHash = await freeze(owner, user1.accountAddress);
+  // await aptos.waitForTransaction({ transactionHash: freezeTransactionHash });
+  // console.log("🚀 ~ main ~ freezed Transaction Hash:", freezeTransactionHash);
+
+  // console.log("Check if we can transfer funds after freezing the account");
+
+  // let ntx2 = await nativeTransfer(
+  //   user1,
+  //   metadata,
+  //   user2.accountAddress,
+  //   100000000000000
+  // );
+  // console.log("🚀 ~ main ~ ntx2:", ntx2);
+  // if (!ntx2) {
+  //   console.log("Can not transfer the funds");
+
+  //   console.log(
+  //     "Now try to transfer 100000000000000 via our module transfer method"
+  //   );
+  //   let ctx = await transfer(
+  //     owner,
+  //     user1.accountAddress,
+  //     user2.accountAddress,
+  //     100000000000000
+  //   );
+  //   console.log("🚀 ~ main ~ ctx:", ctx);
+  //   console.log(
+  //     `User1's updated KCash balance After custom transfer: ${await getFaBalance(
+  //       user1,
+  //       metadataAddress
+  //     )}.`
+  //   );
+  // }
 
   console.log("done.");
  }

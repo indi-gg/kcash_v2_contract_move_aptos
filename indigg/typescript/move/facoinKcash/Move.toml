@@ -1,10 +1,10 @@
 [package]
-name = "kcashFA"
+name = "facoinKcash"
 version = "1.0.0"
 authors = []
 
 [addresses]
-kcash_addr = "_"
+FACoinAddr = "_"
 
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-core.git"

@@ -23,6 +23,7 @@ import {
   unfreeze,
   getFaBalance,
   getMetadata,
+  getIs_freez,
 } from "../kcash_fungible_asset";
 import { compilePackage, getPackageBytesToPublish } from "../utils";
 
@@ -56,7 +57,6 @@ describe("Testing Aptos Blockchain Functions", () => {
     metadataAddress = await getMetadata(owner);
     console.log("metadataAddress", metadataAddress);
   }, 20000);
-
   describe("fromPrivateKeyAndAddress", () => {
     it("derives the correct account from a  ed25519 private key", () => {
       let privateKeyOwner = new Ed25519PrivateKey(
@@ -69,6 +69,7 @@ describe("Testing Aptos Blockchain Functions", () => {
       expect(owner.privateKey.toString()).toEqual(privateKeyOwner.toString());
     });
   });
+
   describe("aptos config", () => {
     it("it should set urls based on a local network", () => {
       const settings: AptosSettings = {
@@ -157,6 +158,7 @@ describe("Testing Aptos Blockchain Functions", () => {
         console.log("error", error);
       }
     });
+
     it("burn coin", async () => {
       try {
         // Assuming Alice wants to burn some coins from her account
@@ -256,35 +258,45 @@ describe("Testing Aptos Blockchain Functions", () => {
     });
   });
 
-  // describe("freeze and unfreeze functions", () => {
-  //   it("should freeze the specified account and return the transaction hash", async () => {
-  //     try {
-  //       // Test freezing an account
-  //       console.log("Testing freeze...");
-  //       const freezeTransactionHash = await freeze(owner, user1.accountAddress);
-  //       console.log("Freeze transaction hash:", freezeTransactionHash);
-  //       // You can add more assertions here if needed
-  //       // expect(freezeTransactionHash).toBe(true);
-  //       expect(freezeTransactionHash).toBeDefined();
-  //       // expect(freezeTransactionHash).toHaveBeenCalled()
-  //       expect(typeof freezeTransactionHash).toBe("string");
-  //     } catch (error) {
-  //       console.log("Error while freezing account:", error);
-  //     }
-  //   });
-  //   it("should unfreeze the specified account and return the transaction hash", async () => {
-  //     try {
-  //       // Test unfreezing an account
-  //       console.log("Testing unfreeze...");
-  //       const unfreezeTransactionHash = await unfreeze(
-  //         owner,
-  //         user1.accountAddress
-  //       );
-  //       console.log("Unfreeze transaction hash:", unfreezeTransactionHash);
-  //       // You can add more assertions here if needed
-  //     } catch (error) {
-  //       console.log("Error while unfreezing account:", error);
-  //     }
-  //   });
-  // });
+  describe("freeze and unfreeze functions", () => {
+    it("should freeze the specified account and return the transaction hash", async () => {
+      try {
+        // Test freezing an account
+        console.log("Testing freeze...");
+        const freezeTransactionHash = await freeze(owner, user1.accountAddress);
+        const is_freez = await getIs_freez(user1, metadataAddress);
+        console.log("is_freez", is_freez);
+        const user1blanse = await getFaBalance(user1, metadataAddress);
+        // console.log(`Owner's balance of asset type  ${is_freeze.amount}`);
+        // console.log(`Is Frozen: ${is_freeze.isFrozen}`);
+        console.log("is_freeze", user1blanse);
+        // const finalBalanceOwner = await getFaBalance(owner, metadataAddress);
+        expect(is_freez).toBe(true);
+        // expect(freezeTransactionHash).toBeDefined();
+        // expect(typeof freezeTransactionHash).toBe("string");
+      } catch (error) {
+        console.log("Error while freezing account:", error);
+      }
+    });
+
+    it("should unfreeze the specified account and return the transaction hash", async () => {
+      try {
+        // Test unfreezing an account
+        console.log("Testing unfreeze...");
+        const unfreezeTransactionHash = await unfreeze(
+          owner,
+          user1.accountAddress
+        );
+        console.log("Unfreeze transaction hash:", unfreezeTransactionHash);
+        const is_unfreez = await getIs_freez(user1, metadataAddress);
+        console.log("is_unfreez", is_unfreez);
+        expect(is_unfreez).toBe(true);
+        expect(unfreezeTransactionHash).toBeDefined();
+        expect(typeof unfreezeTransactionHash).toBe("string");
+        // You can add more assertions here if needed
+      } catch (error) {
+        console.log("Error while unfreezing account:", error);
+      }
+    });
+  });
 });

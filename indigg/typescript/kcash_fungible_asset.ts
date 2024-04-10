@@ -12,6 +12,8 @@ import {
   Network,
   NetworkToNetworkName,
   Ed25519PrivateKey,
+  Secp256k1PrivateKey,
+  Secp256k1Signature,
 } from "@aptos-labs/ts-sdk";
 import { compilePackage, getPackageBytesToPublish } from "./utils";
 import fs from "fs";
@@ -171,7 +173,6 @@ export async function burnCoin(
       transaction,
       senderAuthenticator,
     });
-
     return pendingTxn.hash;
   } catch (error) {
     console.log("Error while burning coins:", error);
@@ -187,7 +188,6 @@ export async function freeze(
 ): Promise<string> {
   try {
     // console.log("Request received to freeze account:", targetAddress);
-
     const transaction = await aptos.transaction.build.simple({
       sender: admin.accountAddress,
       data: {
@@ -209,7 +209,6 @@ export async function freeze(
       senderAuthenticator,
     });
     // console.log("Transaction submitted successfully.");
-
     return pendingTxn.hash;
   } catch (error) {
     console.error("Error occurred while freezing account:", error);
@@ -218,6 +217,7 @@ export async function freeze(
 }
 
 /** Admin unfreezes the primary fungible store of the specified account */
+
 export async function unfreeze(
   admin: Account,
   targetAddress: AccountAddress
@@ -239,6 +239,7 @@ export async function unfreeze(
     senderAuthenticator,
   });
 
+  return pendingTxn.hash;
   return pendingTxn.hash;
 }
 
@@ -267,7 +268,36 @@ export const getFaBalance = async (
 };
 
 /** Return the address of the managed fungible asset that's created when this module is deployed */
-async function getMetadata(admin: Account) {
+export const getIs_freez = async (
+  owner: Account,
+  assetType: string
+): Promise<boolean> => {
+  // console.log(`Request for balance of asset type ${owner} for owner ${assetType} received.`);
+
+  try {
+    const data = await aptos.getCurrentFungibleAssetBalances({
+      options: {
+        where: {
+          owner_address: { _eq: owner.accountAddress.toStringLong() },
+          asset_type: { _eq: assetType },
+        },
+      },
+    });
+
+    console.log("data ---", data);
+
+    // console.log(`Successfully retrieved balance data:`, data);
+
+    return data[0]?.is_frozen ?? false;
+  } catch (error) {
+    // console.log(`Error while retrieving balance data:`, error);
+    return false;
+  }
+};
+
+export async function getMetadata(admin: Account) {
+  // console.log(`Request for metadata for admin account ${admin} received.`);
+
   const payload: InputViewFunctionData = {
     function: `${admin.accountAddress}::fa_coin::get_metadata`,
     functionArguments: [],
@@ -362,7 +392,9 @@ async function main() {
     amount_to_mint * 0.3
   );
 
-  await aptos.waitForTransaction({ transactionHash: mintCoinTransactionHash });
+  await aptos.waitForTransaction({
+    transactionHash: mintCoinTransactionHash,
+  });
   console.log("🚀 ~ main ~ mint trx hash:", mintCoinTransactionHash);
 
   console.log(
@@ -446,8 +478,6 @@ async function main() {
   //       metadataAddress
   //     )}.`
   //   );
-  // }
-
   console.log("done.");
 }
 

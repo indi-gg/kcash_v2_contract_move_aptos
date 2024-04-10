@@ -151,6 +151,35 @@ async function mintCoin(
   return pendingTxn.hash;
 }
 
+/** Admin mint the newly created coin to the bulk of the specified receiver address */
+async function bulkMintCoin(
+  admin: Account,
+  receiver: AccountAddress[],
+  amount: AnyNumber[],
+  reward1: AnyNumber[],
+  reward2: AnyNumber[],
+  reward3: AnyNumber[]
+): Promise<string> {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${admin.accountAddress}::fa_coin::bulk_mint`,
+      functionArguments: [receiver, amount, reward1, reward2, reward3],
+    },
+  });
+
+  const senderAuthenticator = await aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
+  });
+
+  return pendingTxn.hash;
+}
+
 export async function burnCoin(
   admin: Account,
   fromAddress: AccountAddress,
@@ -381,48 +410,72 @@ async function main() {
   console.log(
     `User2's initial balance: ${await getFaBalance(user2, metadataAddress)}.`
   );
+  let amt2 = amount_to_mint / 2;
 
-  console.log("Owner mints Owner 1000000000 coins.");
-  const mintCoinTransactionHash = await mintCoin(
+  let amount_ar = [amount_to_mint, amt2];
+  let receiver_ar = [user1.accountAddress, user2.accountAddress];
+  let r1_ar = [amount_to_mint * 0.5, amt2 * 0.5];
+  let r2_ar = [amount_to_mint * 0.3, amt2 * 0.3];
+  let r3_ar = [amount_to_mint * 0.2, amt2 * 0.2];
+
+  let bulkMintTx = await bulkMintCoin(
     owner,
-    user1,
-    amount_to_mint,
-    amount_to_mint * 0.5,
-    amount_to_mint * 0.2,
-    amount_to_mint * 0.3
+    receiver_ar,
+    amount_ar,
+    r1_ar,
+    r2_ar,
+    r3_ar
   );
-
-  await aptos.waitForTransaction({
-    transactionHash: mintCoinTransactionHash,
-  });
-  console.log("🚀 ~ main ~ mint trx hash:", mintCoinTransactionHash);
+  await aptos.waitForTransaction({ transactionHash: bulkMintTx });
+  console.log("🚀 ~ main ~ bulkMintTx:", bulkMintTx);
 
   console.log(
-    `User1's updated KCash primary fungible store balance: ${await getFaBalance(
-      user1,
-      metadataAddress
-    )}.`
+    `User1's final balance: ${await getFaBalance(user1, metadataAddress)}.`
   );
 
-  let bs = await getBucketStore(user1);
-  console.log("🚀 ~ main ~ bs:", bs);
-
-  // TO Transfer coin
-  let transferTx = await transferCoin(
-    owner,
-    user1.accountAddress,
-    user2.accountAddress,
-    amount_to_withdraw
-  );
-  await aptos.waitForTransaction({ transactionHash: transferTx });
-  console.log("🚀 ~ main ~ transferTx:", transferTx);
-
-  console.log("Now user2 bucket balance is");
-  console.log("🚀 ~ main ~ user1 bucket :", await getBucketStore(user1));
-  console.log("🚀 ~ main ~ user2 bucket :", await getBucketStore(user2));
   console.log(
     `User2's final balance: ${await getFaBalance(user2, metadataAddress)}.`
   );
+
+  // console.log("Owner mints Owner 1000000000 coins.");
+  // const mintCoinTransactionHash = await mintCoin(
+  //   owner,
+  //   user1,
+  //   amount_to_mint,
+  //   amount_to_mint * 0.5,
+  //   amount_to_mint * 0.2,
+  //   amount_to_mint * 0.3
+  // );
+
+  // await aptos.waitForTransaction({ transactionHash: mintCoinTransactionHash });
+  // console.log("🚀 ~ main ~ mint trx hash:", mintCoinTransactionHash);
+
+  // console.log(
+  //   `User1's updated KCash primary fungible store balance: ${await getFaBalance(
+  //     user1,
+  //     metadataAddress
+  //   )}.`
+  // );
+
+  // let bs = await getBucketStore(user1);
+  // console.log("🚀 ~ main ~ bs:", bs);
+
+  // // TO Transfer coin
+  // let transferTx = await transferCoin(
+  //   owner,
+  //   user1.accountAddress,
+  //   user2.accountAddress,
+  //   amount_to_withdraw
+  // );
+  // await aptos.waitForTransaction({ transactionHash: transferTx });
+  // console.log("🚀 ~ main ~ transferTx:", transferTx);
+
+  // console.log("Now user2 bucket balance is");
+  // console.log("🚀 ~ main ~ user1 bucket :", await getBucketStore(user1));
+  // console.log("🚀 ~ main ~ user2 bucket :", await getBucketStore(user2));
+  // console.log(
+  //   `User2's final balance: ${await getFaBalance(user2, metadataAddress)}.`
+  // );
 
   // console.log(
   //   "--------Now try to transfer the funds using native transfer method-------------"

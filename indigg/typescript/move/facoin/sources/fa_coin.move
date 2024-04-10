@@ -14,11 +14,13 @@ module FACoin::fa_coin {
     use std::string::{Self, String};
     use std::string::utf8;
     use std::option;
+    use std::vector;
 
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
     const EUSER_DO_NOT_HAVE_BUCKET_STORE: u64 = 2;
     const EAMOUNT_SHOULD_BE_EQUAL_TO_ASSETS: u64 = 3;
+    const EWITHDRAWABLE_AMOUNT_SHOULD_BE_EQUAL_OR_LESS_THAN_BUCKET_ASSETS: u64 = 4;
 
     const ASSET_SYMBOL: vector<u8> = b"FA";
     const BUCKET_CORE_SEED: vector<u8> = b"BA";
@@ -59,7 +61,6 @@ module FACoin::fa_coin {
         reward2: u64,
         reward3: u64,
     }
-
     #[event]
     /// Emitted when bucket rewards are withdrawn from a store.
     struct WithdrawFromBucket has drop, store {
@@ -126,7 +127,7 @@ module FACoin::fa_coin {
     }
 
     // To create a bucket store for the user if it doesnot exist
-   fun create_bucket_store(user: address) acquires BucketCore {
+    fun create_bucket_store(user: address) acquires BucketCore {
         let description = utf8(BUCKET_COLLECTION_DESCRIPTION);
         let name = utf8(BUCKET_COLLECTION_NAME);
         let uri = utf8(b"http://example.com");
@@ -187,7 +188,6 @@ module FACoin::fa_coin {
             &utf8(BUCKET_COLLECTION_NAME),
             &get_bucket_user_name(creator_addr),
         );
-
         bucket_address
     }
 
@@ -216,11 +216,12 @@ module FACoin::fa_coin {
         event::emit(DepositToBucket { receiver: owner_addr, reward1: r1, reward2: r2, reward3: r3 });
     }
 
-    // To deposit the rewards value of the user's bucket store
+    // To withdraw the rewards value of the user's bucket store
     fun withdraw_from_bucket(owner_addr: address, amount: u64) acquires BucketStore{
         assert!(has_bucket_store(owner_addr), error::already_exists(EUSER_DO_NOT_HAVE_BUCKET_STORE));
         let token_address = get_bucket_user_address(&owner_addr);
         let bs = borrow_global_mut<BucketStore>(token_address);
+        assert!(bs.reward1+bs.reward2+bs.reward3 >= amount, error::invalid_argument(EWITHDRAWABLE_AMOUNT_SHOULD_BE_EQUAL_OR_LESS_THAN_BUCKET_ASSETS));
         if (bs.reward3 >= amount){
             bs.reward3 = bs.reward3 - amount;
         } else if (bs.reward3 + bs.reward2 >= amount){
@@ -252,7 +253,6 @@ module FACoin::fa_coin {
         object::address_to_object<Metadata>(asset_address)
     }
 
-    //TODO: add Bucket param
     // :!:>mint
     /// Mint as the owner of metadata object and deposit to a specific account.
     public entry fun mint(admin: &signer, to: address, amount: u64, r1: u64, r2: u64, r3: u64) acquires ManagedFungibleAsset, BucketCore, BucketStore {
@@ -262,18 +262,33 @@ module FACoin::fa_coin {
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
 
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
-
-        //pupulate bucket props
+        // create a store if not exist and deposit the values in bucket
         deposit_to_bucket(to, r1, r2, r3);
-
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
-
-        // Freeeze the account
+        // Freeeze the account so that native trnsfer would not work
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         fungible_asset::set_frozen_flag(transfer_ref, wallet, true);
 
     }// <:!:mint_to
+
+    // :!:>Bulk mint
+    /// Mint as the owner of metadata object and deposit to specific account in bulk
+    public entry fun bulk_mint(admin: &signer, to_vec: vector<address>, amt_vec: vector<u64>, r1_vec: vector<u64>, r2_vec: vector<u64>, r3_vec: vector<u64>)
+        acquires ManagedFungibleAsset, BucketCore, BucketStore{
+        let len = vector::length(&to_vec);
+        let i = 0;
+        loop {
+            let to = vector::borrow(&to_vec, i);
+            let amount = vector::borrow(&amt_vec, i);
+            let r1 = vector::borrow(&r1_vec, i);
+            let r2 = vector::borrow(&r2_vec, i);
+            let r3 = vector::borrow(&r3_vec, i);
+            mint(admin, *to, *amount, *r1, *r2, *r3);
+            i = i + 1;
+            if (i >= len) break;
+        }
+    }
 
     /// Transfer as the owner of metadata object ignoring `frozen` field.
     public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset, BucketStore, BucketCore  {

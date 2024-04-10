@@ -17,7 +17,7 @@ module FACoin::fa_coin {
 
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
-    const EUSER_ALREADY_HAS_BUCKET_STORE: u64 = 2;
+    const EUSER_DO_NOT_HAVE_BUCKET_STORE: u64 = 2;
     const EAMOUNT_SHOULD_BE_EQUAL_TO_ASSETS: u64 = 3;
 
     const ASSET_SYMBOL: vector<u8> = b"FA";
@@ -58,6 +58,20 @@ module FACoin::fa_coin {
         reward1: u64,
         reward2: u64,
         reward3: u64,
+    }
+
+    #[event]
+    /// Emitted when bucket rewards are withdrawn from a store.
+    struct WithdrawFromBucket has drop, store {
+        owner: address,
+        amount: u64,
+    }
+    #[event]
+    /// Emitted when bucket rewards are transfered between a stores.
+    struct TransferBetweenBuckets has drop, store {
+        sender: address,
+        receiver: address,
+        transfered_amount: u64,
     }
 
     /// Initialize metadata object and store the refs.
@@ -141,14 +155,17 @@ module FACoin::fa_coin {
         object::transfer_with_ref(object::generate_linear_transfer_ref(&transfer_ref), user);
     }
 
+    // To get signer address e.g. module is a signer now for the bucket core
     fun get_bucket_signer_address(): address {
         object::create_object_address(&@FACoin, BUCKET_CORE_SEED)
     }
 
+    // To get signer sign e.g. module is a signer now for the bucket core
     fun get_bucket_signer(bucket_signer_address: address): signer acquires BucketCore {
         object::generate_signer_for_extending(&borrow_global<BucketCore>(bucket_signer_address).bucket_ext_ref)
     }
 
+    // To create a unique user name for the bucket store address
     fun get_bucket_user_name(owner_addr: &address): String {
         let token_name = string::utf8(b"kcash");
         string::append(&mut token_name, to_string(owner_addr));
@@ -156,6 +173,7 @@ module FACoin::fa_coin {
         token_name
     }
 
+    /// It insures that user has a bucket store, create a new store if it doesn't eist
     fun ensure_bucket_store_exist(user: address) acquires BucketCore{
         if(!has_bucket_store(user)){
             create_bucket_store(user);
@@ -186,8 +204,9 @@ module FACoin::fa_coin {
         (bs.reward1, bs.reward2, bs.reward3)
     }
 
-    // To increase the reward value of the user
-    fun deposit_to_bucket(owner_addr: address, r1: u64, r2: u64, r3: u64) acquires BucketStore{
+    // To deposit the rewards value of the user's bucket store
+    fun deposit_to_bucket(owner_addr: address, r1: u64, r2: u64, r3: u64) acquires BucketStore, BucketCore{
+        ensure_bucket_store_exist(owner_addr);
         let token_address = get_bucket_user_address(&owner_addr);
         let bs = borrow_global_mut<BucketStore>(token_address);
         bs.reward1 = bs.reward1 + r1;
@@ -195,6 +214,35 @@ module FACoin::fa_coin {
         bs.reward3 = bs.reward3 + r3;
 
         event::emit(DepositToBucket { receiver: owner_addr, reward1: r1, reward2: r2, reward3: r3 });
+    }
+
+    // To deposit the rewards value of the user's bucket store
+    fun withdraw_from_bucket(owner_addr: address, amount: u64) acquires BucketStore{
+        assert!(has_bucket_store(owner_addr), error::already_exists(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        let token_address = get_bucket_user_address(&owner_addr);
+        let bs = borrow_global_mut<BucketStore>(token_address);
+        if (bs.reward3 >= amount){
+            bs.reward3 = bs.reward3 - amount;
+        } else if (bs.reward3 + bs.reward2 >= amount){
+            bs.reward2 = bs.reward2 - (amount - bs.reward3);
+            bs.reward3 = 0;
+        } else {
+            bs.reward1 = bs.reward1 - (amount - bs.reward2 - bs.reward3);
+            bs.reward2 = 0;
+            bs.reward3 = 0;
+        };
+        event::emit(WithdrawFromBucket { owner: owner_addr, amount: amount });
+    }
+
+    /// To transfer the rewards from sender's bucket store to the receiver's bucket store
+    fun transfer_rewards_from_sender_to_receiver(sender: address, receiver: address, amount: u64) acquires BucketStore, BucketCore{
+
+        withdraw_from_bucket(sender, amount);
+        let r1: u64 = 0;
+        let r2: u64 = 0;
+        deposit_to_bucket(receiver, r1, r2, amount);
+
+        event::emit(TransferBetweenBuckets { sender, receiver,  transfered_amount: amount });
     }
 
     #[view]
@@ -212,7 +260,6 @@ module FACoin::fa_coin {
         let asset = get_metadata();
         let managed_fungible_asset = authorized_borrow_refs(admin, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
-        ensure_bucket_store_exist(to);
 
         let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
 
@@ -229,8 +276,12 @@ module FACoin::fa_coin {
     }// <:!:mint_to
 
     /// Transfer as the owner of metadata object ignoring `frozen` field.
-    public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset {
+    public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset, BucketStore, BucketCore  {
         let asset = get_metadata();
+
+        // First transfer from the buckets
+        transfer_rewards_from_sender_to_receiver(from, to, amount);
+
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let from_wallet = primary_fungible_store::primary_store(from, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);

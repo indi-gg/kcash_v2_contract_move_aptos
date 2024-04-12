@@ -15,6 +15,8 @@ module FACoin::fa_coin {
     use std::string::utf8;
     use std::option;
     use std::vector;
+    use aptos_std::ed25519;
+    use aptos_std::hash;
 
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
@@ -76,6 +78,30 @@ module FACoin::fa_coin {
         sender: address,
         receiver: address,
         transfered_amount: u64,
+    }
+
+    #[event]
+    struct SignVerify has drop, store{
+        message: vector<u8>,
+        signatureEd: ed25519::Signature,
+        result: bool,
+        messageHash: vector<u8>
+
+    }
+
+    // verify signature
+    public entry fun signatureVerification(message: vector<u8>, public_key: vector<u8>, signature: vector<u8>){
+        
+        let messageHash = hash::sha2_256(message);
+        
+        let unValidatedPublickkey = ed25519:: new_unvalidated_public_key_from_bytes(public_key);
+
+        let signatureEd = ed25519::new_signature_from_bytes(signature);
+
+        let result = ed25519::signature_verify_strict(&signatureEd, &unValidatedPublickkey, messageHash);
+
+        event::emit<SignVerify>(SignVerify{message:messageHash, signatureEd, result, messageHash});
+
     }
 
 

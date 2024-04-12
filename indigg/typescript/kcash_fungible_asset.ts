@@ -7,16 +7,17 @@ import {
   AnyNumber,
   Aptos,
   AptosConfig,
-  Ed25519Account,
   InputViewFunctionData,
   Network,
   NetworkToNetworkName,
   Ed25519PrivateKey,
-  Secp256k1PrivateKey,
-  Secp256k1Signature,
+  Ed25519PublicKey,
+  Ed25519Signature
 } from "@aptos-labs/ts-sdk";
 import { compilePackage, getPackageBytesToPublish } from "./utils";
 import fs from "fs";
+import sha256 from "fast-sha256";
+
 
 /**
  * This example demonstrate how one can compile, deploy, and mint its own fungible asset (FA)
@@ -47,15 +48,45 @@ console.log("🚀 ~ decimal_kcash:", decimal_kcash);
 
 let owner_kp = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
 const privateKeyOwner = new Ed25519PrivateKey(owner_kp.privateKey);
+const publicKeyOwner = new Ed25519PublicKey(owner_kp.publicKey);
 const owner = Account.fromPrivateKey({ privateKey: privateKeyOwner });
 
 let user_kp = JSON.parse(fs.readFileSync("./keys/user.json", "utf8"));
-const privateKeyuser = new Ed25519PrivateKey(user_kp.privateKey);
-const user1 = Account.fromPrivateKey({ privateKey: privateKeyuser });
+const privateKeyuser1 = new Ed25519PrivateKey(user_kp.privateKey);
+const user1 = Account.fromPrivateKey({ privateKey: privateKeyuser1 });
 
 let user2_kp = JSON.parse(fs.readFileSync("./keys/user2.json", "utf8"));
 const privateKeyuser2 = new Ed25519PrivateKey(user2_kp.privateKey);
 const user2 = Account.fromPrivateKey({ privateKey: privateKeyuser2 });
+
+// Message & Hash
+const message = new Uint8Array(Buffer.from("KCash"));
+const messageHash = sha256(message);
+
+// Signature Method : Sign a message through PrivateKey
+async function signMessage(privateKey: Ed25519PrivateKey, messageHash: Uint8Array,): Promise<Ed25519Signature> {
+  const signature = await privateKey.sign(messageHash);
+  return signature;
+}
+
+// Signature Verification Method : Verify signature through Public Key
+async function signatureVerification(message: Uint8Array, public_key: Uint8Array, signature: Ed25519Signature, owner: Account) {
+  const transaction = await aptos.transaction.build.simple({sender: owner.accountAddress, data: {
+      function: `${owner.accountAddress}::fa_coin::signatureVerification`,
+      functionArguments: [message, public_key, signature.toUint8Array()],
+    },
+  });
+
+  const senderAuthenticator = await aptos.transaction.sign({signer: owner, transaction,});
+  const pendingTxn = await aptos.transaction.submit.simple({transaction, senderAuthenticator,});
+  console.log("🚀 ~ signatureVerification ~ pendingTxn:", pendingTxn.hash);
+
+  await aptos.waitForTransaction({transactionHash: pendingTxn.hash,});
+  console.log("Verification Done");
+
+  return pendingTxn.hash;
+}
+
 
 /** Admin forcefully transfers the newly created coin to the specified receiver address */
 export async function transferCoin(
@@ -449,42 +480,20 @@ async function main() {
   let metadataAddress = metadata.toString();
   console.log("metadata address:", metadataAddress);
 
-  console.log(
-    "\n All the balances in this exmaple refer to balance in primary fungible stores of each account."
-  );
-  console.log(
-    `Owner's initial KCash balance: ${await getFaBalance(
-      owner,
-      metadataAddress
-    )}.`
-  );
-  console.log(
-    `User1's initial balance: ${await getFaBalance(user1, metadataAddress)}.`
-  );
-  console.log(
-    `User2's initial balance: ${await getFaBalance(user2, metadataAddress)}.`
-  );
+  console.log("\n All the balances in this exmaple refer to balance in primary fungible stores of each account.");
+  console.log(`Owner's initial KCash balance: ${await getFaBalance(owner,metadataAddress)}.`);
+  console.log(`User1's initial balance: ${await getFaBalance(user1, metadataAddress)}.`);
+  console.log(`User2's initial balance: ${await getFaBalance(user2, metadataAddress)}.`);
 
-  console.log("\nOwner mints 1000 kcash in his own account");
+  console.log("\nOwner mints 1000 kcash in self account");
 
   let owner_mint = 1000 * decimal_kcash;
-  let mTx = await mintCoin(
-    owner,
-    owner,
-    owner_mint,
-    owner_mint * 0.1,
-    owner_mint * 0.2,
-    owner_mint * 0.7
-  );
+  let mTx = await mintCoin(owner, owner, owner_mint, owner_mint * 0.1, owner_mint * 0.2, owner_mint * 0.7);
+
   await aptos.waitForTransaction({ transactionHash: mTx });
   console.log("🚀 ~ mTx:", mTx);
 
-  console.log(
-    `Owner's KCash balance after mint: ${await getFaBalance(
-      owner,
-      metadataAddress
-    )}.`
-  );
+  console.log(`Owner's KCash balance after mint: ${await getFaBalance(owner,metadataAddress)}.`);
   console.log("Owner bucket store :", await getBucketStore(owner));
 
   console.log("\n Mint in Bulk for user1 and user2****");
@@ -498,111 +507,42 @@ async function main() {
   let r2_ar = [amount_to_mint_user1 * 0.3, amount_to_mint_user2 * 0.3];
   let r3_ar = [amount_to_mint_user1 * 0.2, amount_to_mint_user2 * 0.2];
 
-  let bulkMintTx = await bulkMintCoin(
-    owner,
-    receiver_ar,
-    amount_ar,
-    r1_ar,
-    r2_ar,
-    r3_ar
-  );
+  let bulkMintTx = await bulkMintCoin(owner, receiver_ar, amount_ar, r1_ar, r2_ar, r3_ar);
   await aptos.waitForTransaction({ transactionHash: bulkMintTx });
   console.log("🚀 ~ main ~ bulkMintTx:", bulkMintTx);
 
-  console.log(
-    `\nUser1's kcash balance after mint: ${await getFaBalance(
-      user1,
-      metadataAddress
-    )}.`
-  );
+  console.log(`\nUser1's kcash balance after mint: ${await getFaBalance(user1, metadataAddress)}.`);
   console.log("User1 bucket store :", await getBucketStore(user1));
 
-  console.log(
-    `\nUser2's kcash balance after mint: ${await getFaBalance(
-      user2,
-      metadataAddress
-    )}.`
-  );
+  console.log(`\nUser2's kcash balance after mint: ${await getFaBalance(user2, metadataAddress)}.`);
   console.log("User2 bucket store :", await getBucketStore(user2));
 
-  console.log(
-    "\n Owner transfers from 10 kcash from his bucket3 to user2's bucket1"
-  );
-  let rewTx = await transferReward3ToReward1ByAdminOnly(
-    owner,
-    user2.accountAddress,
-    10 * decimal_kcash
-  );
+  console.log("\n Owner transfers from 10 kcash from his bucket3 to user2's bucket1");
+  let rewTx = await transferReward3ToReward1ByAdminOnly(owner, user2.accountAddress, 10 * decimal_kcash);
   console.log("🚀 ~ rewTx:", rewTx);
 
-  console.log(
-    `\Owner's final kcash balance after transfer: ${await getFaBalance(
-      owner,
-      metadataAddress
-    )}.`
-  );
-  console.log(
-    "Owner bucket store after transfer :",
-    await getBucketStore(owner)
-  );
+  console.log(`\Owner's final kcash balance after transfer: ${await getFaBalance(owner, metadataAddress)}.`);
+  console.log("Owner bucket store after transfer :", await getBucketStore(owner));
 
-  console.log(
-    `\nUser2's final kcash balance after transfer: ${await getFaBalance(
-      user2,
-      metadataAddress
-    )}.`
-  );
-  console.log(
-    "User2 bucket store after transfer :",
-    await getBucketStore(user2)
-  );
+  console.log(`\nUser2's final kcash balance after transfer: ${await getFaBalance(user2, metadataAddress)}.`);
+  console.log("User2 bucket store after transfer :", await getBucketStore(user2));
 
-  console.log(
-    "\nNow Owner will transfer in bulk from his bucket3 to bucket1 of users"
-  );
+  console.log("\nNow Owner will transfer in bulk from his bucket3 to bucket1 of users");
   console.log("10 kcash will be ransferred in user1 account");
   console.log("20 kcash will be ransferred in user2 account");
   amount_ar = [10 * decimal_kcash, 20 * decimal_kcash];
 
-  let bTtx = await transferReward3ToReward1ByAdminOnlyInBulk(
-    owner,
-    receiver_ar,
-    amount_ar
-  );
+  let bTtx = await transferReward3ToReward1ByAdminOnlyInBulk(owner, receiver_ar, amount_ar);
   console.log("🚀 ~ bTtx:", bTtx);
 
-  console.log(
-    `\Owner's final kcash balance after transfer in bulk: ${await getFaBalance(
-      owner,
-      metadataAddress
-    )}.`
-  );
-  console.log(
-    "Owner bucket store after transfer in bulk :",
-    await getBucketStore(owner)
-  );
+  console.log(`\Owner's final kcash balance after transfer in bulk: ${await getFaBalance(owner, metadataAddress)}.`);
+  console.log("Owner bucket store after transfer in bulk :", await getBucketStore(owner));
 
-  console.log(
-    `\nUser1's final kcash balance after transfer in bulk: ${await getFaBalance(
-      user1,
-      metadataAddress
-    )}.`
-  );
-  console.log(
-    "User1 bucket store after transfer in bulk :",
-    await getBucketStore(user1)
-  );
+  console.log(`\nUser1's final kcash balance after transfer in bulk: ${await getFaBalance(user1, metadataAddress)}.`);
+  console.log("User1 bucket store after transfer in bulk :", await getBucketStore(user1));
 
-  console.log(
-    `\nUser2's final kcash balance after transfer in bulk: ${await getFaBalance(
-      user2,
-      metadataAddress
-    )}.`
-  );
-  console.log(
-    "User2 bucket store after transfer in bulk :",
-    await getBucketStore(user2)
-  );
+  console.log(`\nUser2's final kcash balance after transfer in bulk: ${await getFaBalance(user2, metadataAddress)}.`);
+  console.log("User2 bucket store after transfer in bulk :", await getBucketStore(user2));
 
   // console.log("Owner mints Owner 1000000000 coins.");
   // const mintCoinTransactionHash = await mintCoin(
@@ -640,9 +580,7 @@ async function main() {
   console.log("Now user2 bucket balance is");
   console.log("🚀 ~ main ~ user1 bucket :", await getBucketStore(user1));
   console.log("🚀 ~ main ~ user2 bucket :", await getBucketStore(user2));
-  console.log(
-    `User2's final balance: ${await getFaBalance(user2, metadataAddress)}.`
-  );
+  console.log(`User2's final balance: ${await getFaBalance(user2, metadataAddress)}.`);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -700,6 +638,19 @@ async function main() {
   //       metadataAddress
   //     )}.`
   //   );
+
+  const signature = await signMessage(privateKeyOwner, messageHash);
+  console.log("=============================================");
+  console.log("Signature: ", signature.toString());
+  console.log("=============================================");
+
+  const sigVerifyTransaction = signatureVerification(message, publicKeyOwner.toUint8Array(), signature, owner);
+  console.log("Signature transaction", sigVerifyTransaction);
+
+
+
+
+
   console.log("done.");
 }
 

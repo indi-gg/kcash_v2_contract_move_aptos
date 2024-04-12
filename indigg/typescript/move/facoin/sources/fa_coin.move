@@ -198,13 +198,6 @@ module FACoin::fa_coin {
         token_name
     }
 
-    /// It insures that user has a bucket store, create a new store if it doesn't eist
-    fun ensure_bucket_store_exist(user: address) acquires BucketCore{
-        if(!has_bucket_store(user)){
-            create_bucket_store(user);
-        }
-    }
-
     // Get user adress assosiate with bucketstoer
     fun get_bucket_user_address(creator_addr: &address): (address) {
         let bucket_address = token::create_token_address(
@@ -213,6 +206,13 @@ module FACoin::fa_coin {
             &get_bucket_user_name(creator_addr),
         );
         bucket_address
+    }
+
+    /// It insures that user has a bucket store, create a new store if it doesn't eist
+    fun ensure_bucket_store_exist(user: address) acquires BucketCore{
+        if(!has_bucket_store(user)){
+            create_bucket_store(user);
+        }
     }
 
     #[view]
@@ -245,8 +245,11 @@ module FACoin::fa_coin {
         event::emit(DepositToBucket { receiver: owner_addr, reward1: r1, reward2: r2, reward3: r3 });
     }
 
-    // To withdraw the rewards value of the user's bucket store
-    fun withdraw_from_bucket(owner_addr: address, amount: u64) acquires BucketStore{
+    /*  To withdraw the rewards value of the user's bucket store
+        @param amount which is withdraw from the bucketstore in order 
+        reward3, reward2, reward1
+    */ 
+    fun withdraw_amount_from_bucket(owner_addr: address, amount: u64) acquires BucketStore{
         assert!(has_bucket_store(owner_addr), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
         let token_address = get_bucket_user_address(&owner_addr);
         let bs = borrow_global_mut<BucketStore>(token_address);
@@ -264,10 +267,24 @@ module FACoin::fa_coin {
         event::emit(WithdrawFromBucket { owner: owner_addr, amount: amount });
     }
 
+     /*  To withdraw the rewards value of the user's bucket store
+        @param reward1 which is withdraw from the bucketstore's reward1
+        @param reward2 which is withdraw from the bucketstore's reward2
+        @param reward3 which is withdraw from the bucketstore's reward3
+    */ 
+    fun withdraw_rewards_from_bucket(owner_addr: address, r1: u64, r2: u64, r3: u64) acquires BucketStore{
+        assert!(has_bucket_store(owner_addr), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        let token_address = get_bucket_user_address(&owner_addr);
+        let bs = borrow_global_mut<BucketStore>(token_address);
+        bs.reward1 = bs.reward1 - r1;
+        bs.reward1 = bs.reward2 - r2;
+        bs.reward1 = bs.reward3 - r3;
+    }
+
     /// To transfer the rewards from sender's bucket store to the receiver's bucket store
     fun transfer_rewards_from_sender_to_receiver(sender: address, receiver: address, amount: u64) acquires BucketStore, BucketCore{
 
-        withdraw_from_bucket(sender, amount);
+        withdraw_amount_from_bucket(sender, amount);
         let r1: u64 = 0;
         let r2: u64 = 0;
         deposit_to_bucket(receiver, r1, r2, amount);
@@ -289,6 +306,15 @@ module FACoin::fa_coin {
         transfer_internal(admin, signer::address_of(admin), user, amount);
     }
 
+    /// Transfer private function which works with FA not for Bucket store
+    fun transfer_internal(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset{
+        let asset = get_metadata();
+        let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
+        let from_wallet = primary_fungible_store::primary_store(from, asset);
+        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
+        fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
+    }
+
     #[view]
     /// Return the address of the managed fungible asset that's created when this module is deployed.
     public fun get_metadata(): Object<Metadata> {
@@ -296,6 +322,9 @@ module FACoin::fa_coin {
         object::address_to_object<Metadata>(asset_address)
     }
 
+    /* -----  Entry functions that can be called from outsie ----- */
+
+    /* -----  Only admin can invoke these fun ----- */
     // :!:>mint
     /// Mint as the owner of metadata object and deposit to a specific account.
     public entry fun mint(admin: &signer, to: address, amount: u64, r1: u64, r2: u64, r3: u64) acquires ManagedFungibleAsset, BucketCore, BucketStore {
@@ -316,7 +345,6 @@ module FACoin::fa_coin {
 
     }// <:!:mint_to
 
-    // :!:>Bulk mint
     /// Mint as the owner of metadata object and deposit to specific account in bulk
     public entry fun bulk_mint(admin: &signer, to_vec: vector<address>, amt_vec: vector<u64>, r1_vec: vector<u64>, r2_vec: vector<u64>, r3_vec: vector<u64>)
         acquires ManagedFungibleAsset, BucketCore, BucketStore{
@@ -334,32 +362,113 @@ module FACoin::fa_coin {
         }
     }
 
-    public entry fun admin_transfer_reward3_to_user_bucket2(admin: &signer, to: address, amount: u64) acquires ManagedFungibleAsset, BucketStore{
-        assert!(has_bucket_store(to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
-        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
-        admin_transfer_reward3_to_user_bucket_internal(admin, to, amount, 2);
+    /// Transfer as the owner of metadata object ignoring `frozen` field.
+    public entry fun transfer(admin: &signer, from: &signer, to: address, amount: u64) 
+        acquires ManagedFungibleAsset, BucketStore, BucketCore  {
+        assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        // First transfer from the buckets
+        transfer_rewards_from_sender_to_receiver(signer::address_of(from), to, amount);
+        transfer_internal(admin, signer::address_of(from), to, amount);
     }
 
-    public entry fun admin_transfer_reward3_to_user_bucket2_bulk(admin: &signer, to_vec: vector<address>, amount_vec: vector<u64>) acquires ManagedFungibleAsset, BucketStore{
-        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
-        let len = vector::length(&to_vec);
+    /// Trasnfer in bulk as the owner of metadata object ignoring `frozen` field.
+    /**
+     * @dev Performs bulk transfer of KCash tokens to multiple accounts.
+     * @param accounts The array of recipient addresses.
+     * @param amounts The array of corresponding transfer amounts.
+     * @return A boolean indicating the success of the bulk transfer operation.
+    */
+    public entry fun bulk_transfer(admin: &signer, from: &signer, receiver_vec: vector<address>, amount_vec: vector<u64>)
+        acquires ManagedFungibleAsset, BucketStore, BucketCore {
+        assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        assert!(vector::length(&receiver_vec) == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let len = vector::length(&receiver_vec);
         let i = 0;
         loop {
-            let to = vector::borrow(&to_vec, i);
-            assert!(has_bucket_store(*to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+            let to = vector::borrow(&receiver_vec, i);
             let amount = vector::borrow(&amount_vec, i);
-            admin_transfer_reward3_to_user_bucket_internal(admin, *to, *amount, 2);
+            transfer(admin, from, *to, *amount);
             i = i + 1;
             if (i >= len) break;
         }
     }
+
+    /**
+     * @dev Transfers rewards from the sender's bucket to the recipient's bucket.
+     * Only the address with the ADMIN_TRANSFER_ROLE can call this function.
+     * The amount of rewards transferred must match the sum of rewards deducted from the sender's bucket
+     * and added to the recipient's bucket.
+     *
+     * @param to The address of the recipient.
+     -----Since we can not use custom datatype as parameter, so instead of the bucket store, we're uses the vec of u64
+            which contains reward1, reward2, reward3 for both deductionFromSender and additionToRecipient 
+     * @param deductionFromSender The vec containing the rewards to be deducted from the sender.
+     * @param additionToRecipient The vec containing the rewards to be added to the recipient.
+    */
+    public entry fun admin_transfer(admin: &signer, to: address, deductionFromSender: vector<u64>, additionToRecipient: vector<u64>)
+        acquires ManagedFungibleAsset, BucketStore, BucketCore
+    {
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        assert!(vector::length(&deductionFromSender) == vector::length(&additionToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let (r1, r2, r3) = (*vector::borrow(&deductionFromSender, 0), *vector::borrow(&deductionFromSender, 1), *vector::borrow(&deductionFromSender, 2));
+        withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
+        deposit_to_bucket(to, *vector::borrow(&additionToRecipient, 0), *vector::borrow(&additionToRecipient, 1), *vector::borrow(&additionToRecipient, 2));
+        transfer_internal(admin, signer::address_of(admin), to, r1+r2+r3);
+    }
+
+    /**
+     * @dev Performs bulk admin transfers.
+     * @param to The array of recipient addresses.
+     -----Since we can not use custom datatype as parameter, so instead of the bucket store, we're uses the vec of vec of u64
+            which contains reward1, reward2, reward3 for both deductionFromSender and additionToRecipient 
+     * @param deductionFromSender_vec The vec of vec containing the rewards to be deducted from the sender.
+     * @param additionToRecipient_vec The vec of vec containing the rewards to be added to the recipient.
+     * Requirements:
+     * - The length of `to`, `deductionFromSender`, and `additionToRecipient` arrays must be the same.
+     * - Only the role with ADMIN_TRANSFER_ROLE can call this function.
+    */
+    public entry fun admin_transfer_bulk(admin: &signer, to_vec: vector<address>, deductionFromSender_vec: vector<vector<u64>>, additionToRecipient_vec: vector<vector<u64>>)
+        acquires ManagedFungibleAsset, BucketStore, BucketCore{
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let len = vector::length(&deductionFromSender_vec);
+        assert!(len == vector::length(&additionToRecipient_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let i = 0;
+        loop {
+            let to = vector::borrow(&to_vec, i);
+            let deductionFromSender = vector::borrow(&deductionFromSender_vec, i);
+            let additionToRecipient = vector::borrow(&additionToRecipient_vec, i);
+            admin_transfer(admin, *to, *deductionFromSender, *additionToRecipient);
+            i = i + 1;
+            if (i >= len) break;
+        }
+    }
+
+    /**
+     * @dev Transfers a specified amount from the reward3 balance to the reward1 balance.
+     * Only the address with the ADMIN_TRANSFER_ROLE can call this function.
+     * 
+     * @param to The signer who transfer the funds from.
+     * @param to The address to transfer the funds to.
+     * @param amount The amount of funds to transfer.
+     */
     public entry fun admin_transfer_reward3_to_user_bucket1(admin: &signer, to: address, amount: u64) acquires ManagedFungibleAsset, BucketStore{
         assert!(has_bucket_store(to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
         assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
         admin_transfer_reward3_to_user_bucket_internal(admin, to, amount, 1);
     }
 
+    /**
+     * @dev Transfers tokens from Reward3 to Reward1 in bulk for multiple addresses.
+     * Only the admin with the ADMIN_TRANSFER_ROLE can call this function.
+     * 
+     * @param to The array of addresses to transfer tokens to.
+     * @param amounts The array of token amounts to transfer.
+     * 
+     * Requirements:
+     * - The length of `to` array must be equal to the length of `amounts` array.
+     */
     public entry fun admin_transfer_reward3_to_user_bucket1_bulk(admin: &signer, to_vec: vector<address>, amount_vec: vector<u64>) acquires ManagedFungibleAsset, BucketStore{
+        assert!(vector::length(&to_vec) == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
         assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
         let len = vector::length(&to_vec);
         let i = 0;
@@ -373,38 +482,43 @@ module FACoin::fa_coin {
         }
     }
 
-    /// Transfer as the owner of metadata object ignoring `frozen` field.
-    public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) 
-        acquires ManagedFungibleAsset, BucketStore, BucketCore  {
-        // First transfer from the buckets
-        transfer_rewards_from_sender_to_receiver(from, to, amount);
-        transfer_internal(admin, from, to, amount);
+    /**
+     * @dev Transfers a specified amount from the reward3 balance to the reward2 balance.
+     * Only the address with the ADMIN_TRANSFER_ROLE can call this function.
+     * 
+     * @param to The signer who transfer the funds from.
+     * @param to The address to transfer the funds to.
+     * @param amount The amount of funds to transfer.
+     */
+    public entry fun admin_transfer_reward3_to_user_bucket2(admin: &signer, to: address, amount: u64) acquires ManagedFungibleAsset, BucketStore{
+        assert!(has_bucket_store(to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        admin_transfer_reward3_to_user_bucket_internal(admin, to, amount, 2);
     }
 
-    /// Trasnfer in bulk as the owner of metadata object ignoring `frozen` field.
-    public entry fun bulk_transfer(admin: &signer, sender_vec: vector<address>, receiver_vec: vector<address>, amount_vec: vector<u64>)
-        acquires ManagedFungibleAsset, BucketStore, BucketCore {
-        assert!(vector::length(&sender_vec) == vector::length(&receiver_vec) && vector::length(&sender_vec) == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
-        let len = vector::length(&receiver_vec);
+    /**
+     * @dev Transfers tokens from Reward3 to Reward2 in bulk for multiple addresses.
+     * Only the admin with the ADMIN_TRANSFER_ROLE can call this function.
+     * 
+     * @param to The array of addresses to transfer tokens to.
+     * @param amounts The array of token amounts to transfer.
+     * 
+     * Requirements:
+     * - The length of `to` array must be equal to the length of `amounts` array.
+     */
+    public entry fun admin_transfer_reward3_to_user_bucket2_bulk(admin: &signer, to_vec: vector<address>, amount_vec: vector<u64>) acquires ManagedFungibleAsset, BucketStore{
+        assert!(vector::length(&to_vec) == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let len = vector::length(&to_vec);
         let i = 0;
         loop {
-            let from = vector::borrow(&sender_vec, i);
-            let to = vector::borrow(&receiver_vec, i);
-            assert!(has_bucket_store(*from), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+            let to = vector::borrow(&to_vec, i);
+            assert!(has_bucket_store(*to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
             let amount = vector::borrow(&amount_vec, i);
-            transfer(admin, *from, *to, *amount);
+            admin_transfer_reward3_to_user_bucket_internal(admin, *to, *amount, 2);
             i = i + 1;
             if (i >= len) break;
         }
-    }
-
-    // Transfer private function which works with FA not for Bucket store
-    fun transfer_internal(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset{
-        let asset = get_metadata();
-        let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_fungible_store::primary_store(from, asset);
-        let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
-        fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
 
     /// Burn fungible assets as the owner of metadata object.

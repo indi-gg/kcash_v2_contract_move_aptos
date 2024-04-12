@@ -425,8 +425,8 @@ export async function burnCoin(
   }
 }
 
-/** Admin freezes the primary fungible store of the specified account */
 
+/** Admin freezes the primary fungible store of the specified account */
 export async function freeze(
   admin: Account,
   targetAddress: AccountAddress
@@ -999,10 +999,6 @@ async function main() {
 
   const sigVerifyTransaction = signatureVerification(message, publicKeyOwner.toUint8Array(), signature, owner);
   console.log("Signature transaction", sigVerifyTransaction);
-
-
-
-
 
   console.log("done.");
 }

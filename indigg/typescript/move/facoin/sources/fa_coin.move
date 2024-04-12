@@ -303,8 +303,8 @@ module FACoin::fa_coin {
         let token_address = get_bucket_user_address(&owner_addr);
         let bs = borrow_global_mut<BucketStore>(token_address);
         bs.reward1 = bs.reward1 - r1;
-        bs.reward1 = bs.reward2 - r2;
-        bs.reward1 = bs.reward3 - r3;
+        bs.reward2 = bs.reward2 - r2;
+        bs.reward3 = bs.reward3 - r3;
     }
 
     /// To transfer the rewards from sender's bucket store to the receiver's bucket store
@@ -406,7 +406,7 @@ module FACoin::fa_coin {
         assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
         assert!(vector::length(&deductionFromSender) == vector::length(&additionToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
         let (r1, r2, r3) = (*vector::borrow(&deductionFromSender, 0), *vector::borrow(&deductionFromSender, 1), *vector::borrow(&deductionFromSender, 2));
-        withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
+                withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
         deposit_to_bucket(to, *vector::borrow(&additionToRecipient, 0), *vector::borrow(&additionToRecipient, 1), *vector::borrow(&additionToRecipient, 2));
         transfer_internal(admin, signer::address_of(admin), to, r1+r2+r3);
     }

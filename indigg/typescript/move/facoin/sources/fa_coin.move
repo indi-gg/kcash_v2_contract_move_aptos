@@ -21,6 +21,8 @@ module FACoin::fa_coin {
     const EUSER_DO_NOT_HAVE_BUCKET_STORE: u64 = 2;
     const EAMOUNT_SHOULD_BE_EQUAL_TO_ASSETS: u64 = 3;
     const EAMOUNT_SHOULD_BE_EQUAL_OR_LESS_THAN_BUCKET_ASSETS: u64 = 4;
+    const EUSER_ALREADY_HAS_BUCKET_STORE: u64 = 5;
+    const EINVALID_ARGUMENTS_LENGTH: u64 = 6;
 
     const ASSET_SYMBOL: vector<u8> = b"FA";
     const BUCKET_CORE_SEED: vector<u8> = b"BA";
@@ -35,7 +37,7 @@ module FACoin::fa_coin {
         burn_ref: BurnRef,
     }
 
-    // We need a contract signer as the creator of the bucket core and bucket store
+    // We need a contract signer as the creator of the bucket core and bucket stores
     // Otherwise we need admin to sign whenever a new bucket store is created which is inconvenient
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct BucketCore has key {
@@ -46,6 +48,7 @@ module FACoin::fa_coin {
         bucket_ext_ref: ExtendRef,
     }
     
+    // This is a bucketstore to hold the assets in different fields for every users
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct BucketStore has key{
         reward1: u64,
@@ -84,26 +87,35 @@ module FACoin::fa_coin {
     /// Initialize metadata object and store the refs.
     // :!:>initialize
     fun init_module(admin: &signer) {
-        // init the bucket core
+        // Init the bucket core
+        // We are creating a separate object for the bucket core collection, which helps in stores and creating multiple bucket stores
+        // What happens in Aptos is, we can only stores the structs or values in a object only once at the time of initialization
+        // Later we can only update the storage like adding or subtracting the FAs,
+        // But in our case we need an object where we can stores multiple multiple bucket stores, later also at the time of mint for every user
+        // For this purpose we uses this extendref, and crated a separate object for it
         let bucket_constructor_ref = &object::create_named_object(admin, BUCKET_CORE_SEED);
+
+        // use later this extendref to implement new bucketstores
         let bucket_ext_ref = object::generate_extend_ref(bucket_constructor_ref);
         let bucket_signer = object::generate_signer(bucket_constructor_ref);
-
-        // TODO Documentaion required, 
-
+        // we need a signer to stores the bucket store globally,
         move_to(&bucket_signer, BucketCore{
             bucket_ext_ref,
         });
 
+        // Create the collection that will hold all the Bucket stores
         create_bucket_store_collection(&bucket_signer);
 
+        /*
+         Here we're initializing the metadata for kcash fungible asset,
+        */
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
             option::none(),
             utf8(b"KCash"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
-            0, /* decimals */   // TODO: Make it 0
+            0, /* decimals */ 
             utf8(b"http://example.com/favicon.ico"), /* icon */
             utf8(b"http://example.com"), /* project */
         );
@@ -121,6 +133,7 @@ module FACoin::fa_coin {
 
     // Create the collection that will hold all the BucketStores
     fun create_bucket_store_collection(creator: &signer) {
+        // Metadata for the other object which holds bucket stores
         let description = utf8(BUCKET_COLLECTION_DESCRIPTION);
         let name = utf8(BUCKET_COLLECTION_NAME);
         let uri = utf8(b"http://example.com");
@@ -136,11 +149,15 @@ module FACoin::fa_coin {
 
     // To create a bucket store for the user if it doesnot exist
     fun create_bucket_store(user: address) acquires BucketCore {
+        // Collection and token metadata should be same
         let description = utf8(BUCKET_COLLECTION_DESCRIPTION);
         let name = utf8(BUCKET_COLLECTION_NAME);
         let uri = utf8(b"http://example.com");
-        // assert!(!has_bucket_store(user), error::already_exists(EUSER_ALREADY_HAS_BUCKET_STORE));
+        assert!(!has_bucket_store(user), error::already_exists(EUSER_ALREADY_HAS_BUCKET_STORE));
 
+        // Here creating a token (just like PDAs in solana)
+        // Here we generate a token using user's address and signed the bucketstores
+        // then taransfer it to the user
         let constructor_ref = token::create_named_token(
             &get_bucket_signer(get_bucket_signer_address()),
             name,
@@ -151,8 +168,6 @@ module FACoin::fa_coin {
         );
 
         let token_signer = object::generate_signer(&constructor_ref);
-        // let mutator_ref = token::generate_mutator_ref(&constructor_ref);
-        // let burn_ref = token::generate_burn_ref(&constructor_ref);
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
 
         let new_bs = BucketStore{
@@ -161,6 +176,7 @@ module FACoin::fa_coin {
             reward3: 0,
         };
         move_to(&token_signer, new_bs);
+        // Transferring the ref to the user
         object::transfer_with_ref(object::generate_linear_transfer_ref(&transfer_ref), user);
     }
 
@@ -207,9 +223,14 @@ module FACoin::fa_coin {
 
     #[view]
     public fun get_bucket_store(owner_addr: address): (u64, u64, u64) acquires BucketStore {
-        let token_address = get_bucket_user_address(&owner_addr);
-        let bs = borrow_global<BucketStore>(token_address);
-        (bs.reward1, bs.reward2, bs.reward3)
+        if(has_bucket_store(owner_addr)){
+            let token_address = get_bucket_user_address(&owner_addr);
+            let bs = borrow_global<BucketStore>(token_address);
+            (bs.reward1, bs.reward2, bs.reward3)
+        }
+        else {
+            (0, 0, 0)
+        }
     }
 
     // To deposit the rewards value of the user's bucket store
@@ -256,7 +277,6 @@ module FACoin::fa_coin {
 
     /// Only admin can transfer an amount from the reward3 bucket to the reward1 bucket.
     fun admin_transfer_reward3_to_user_bucket_internal(admin: &signer, user: address, amount: u64, index: u8) acquires ManagedFungibleAsset, BucketStore {
-        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));  // ToDo use this in the entry functions
         let token_address = get_bucket_user_address(&signer::address_of(admin));
         let user_token_address = get_bucket_user_address(&user);
         {
@@ -314,12 +334,33 @@ module FACoin::fa_coin {
         }
     }
 
+    public entry fun admin_transfer_reward3_to_user_bucket2(admin: &signer, to: address, amount: u64) acquires ManagedFungibleAsset, BucketStore{
+        assert!(has_bucket_store(to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        admin_transfer_reward3_to_user_bucket_internal(admin, to, amount, 2);
+    }
+
+    public entry fun admin_transfer_reward3_to_user_bucket2_bulk(admin: &signer, to_vec: vector<address>, amount_vec: vector<u64>) acquires ManagedFungibleAsset, BucketStore{
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let len = vector::length(&to_vec);
+        let i = 0;
+        loop {
+            let to = vector::borrow(&to_vec, i);
+            assert!(has_bucket_store(*to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+            let amount = vector::borrow(&amount_vec, i);
+            admin_transfer_reward3_to_user_bucket_internal(admin, *to, *amount, 2);
+            i = i + 1;
+            if (i >= len) break;
+        }
+    }
     public entry fun admin_transfer_reward3_to_user_bucket1(admin: &signer, to: address, amount: u64) acquires ManagedFungibleAsset, BucketStore{
         assert!(has_bucket_store(to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
         admin_transfer_reward3_to_user_bucket_internal(admin, to, amount, 1);
     }
 
     public entry fun admin_transfer_reward3_to_user_bucket1_bulk(admin: &signer, to_vec: vector<address>, amount_vec: vector<u64>) acquires ManagedFungibleAsset, BucketStore{
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
         let len = vector::length(&to_vec);
         let i = 0;
         loop {
@@ -338,6 +379,23 @@ module FACoin::fa_coin {
         // First transfer from the buckets
         transfer_rewards_from_sender_to_receiver(from, to, amount);
         transfer_internal(admin, from, to, amount);
+    }
+
+    /// Trasnfer in bulk as the owner of metadata object ignoring `frozen` field.
+    public entry fun bulk_transfer(admin: &signer, sender_vec: vector<address>, receiver_vec: vector<address>, amount_vec: vector<u64>)
+        acquires ManagedFungibleAsset, BucketStore, BucketCore {
+        assert!(vector::length(&sender_vec) == vector::length(&receiver_vec) && vector::length(&sender_vec) == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let len = vector::length(&receiver_vec);
+        let i = 0;
+        loop {
+            let from = vector::borrow(&sender_vec, i);
+            let to = vector::borrow(&receiver_vec, i);
+            assert!(has_bucket_store(*from), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+            let amount = vector::borrow(&amount_vec, i);
+            transfer(admin, *from, *to, *amount);
+            i = i + 1;
+            if (i >= len) break;
+        }
     }
 
     // Transfer private function which works with FA not for Bucket store

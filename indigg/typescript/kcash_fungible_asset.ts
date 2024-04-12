@@ -204,7 +204,7 @@ export async function mintCoin(
 }
 
 /** Admin mint the newly created coin to the bulk of the specified receiver address */
-async function bulkMintCoin(
+ export async function bulkMintCoin(
   admin: Account,
   receiver: AccountAddress[],
   amount: AnyNumber[],
@@ -390,17 +390,17 @@ export async function getMetadata(admin: Account) {
 }
 
 
-async function hasBucket(admin: Account) {
+async function hasBucket(admin: AccountAddress) {
   const payload: InputViewFunctionData = {
-    function: `${admin.accountAddress}::fa_coin::has_bucket_store`,
-    functionArguments: [admin.accountAddress],
+    function: `${owner.accountAddress}::fa_coin::has_bucket_store`, //
+    functionArguments: [admin],
   };
   const res = (await aptos.view({ payload }))[0];
   console.log("🚀 ~ hasBucket ~ res:", res);
   return res;
 }
 
-async function getBucketStore(admin: Account) {
+ export async function getBucketStore(admin: Account) {
   const payload: InputViewFunctionData = {
     function: `${owner.accountAddress}::fa_coin::get_bucket_store`,
     functionArguments: [admin.accountAddress],
@@ -437,7 +437,7 @@ async function getBucketStore(admin: Account) {
 }
 
 async function main() {
-    console.log("\n=== Addresses ===");
+  console.log("\n=== Addresses ===");
   console.log(`Owner: ${owner.accountAddress.toString()}`);
   console.log(`User1: ${user1.accountAddress.toString()}`);
   console.log(`User2: ${user2.accountAddress.toString()}`);
@@ -643,6 +643,8 @@ async function main() {
   console.log(
     `User2's final balance: ${await getFaBalance(user2, metadataAddress)}.`
   );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   // console.log(
   //   "--------Now try to transfer the funds using native transfer method-------------"

@@ -388,37 +388,6 @@ module FACoin::fa_coin {
         }
     }
 
-    /// Transfer as the owner of metadata object ignoring `frozen` field.
-    public entry fun transfer(admin: &signer, from: &signer, to: address, amount: u64) 
-        acquires ManagedFungibleAsset, BucketStore, BucketCore  {
-        assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
-        // First transfer from the buckets
-        transfer_rewards_from_sender_to_receiver(signer::address_of(from), to, amount);
-        transfer_internal(admin, signer::address_of(from), to, amount);
-    }
-
-    /// Trasnfer in bulk as the owner of metadata object ignoring `frozen` field.
-    /**
-     * @dev Performs bulk transfer of KCash tokens to multiple accounts.
-     * @param accounts The array of recipient addresses.
-     * @param amounts The array of corresponding transfer amounts.
-     * @return A boolean indicating the success of the bulk transfer operation.
-    */
-    public entry fun bulk_transfer(admin: &signer, from: &signer, receiver_vec: vector<address>, amount_vec: vector<u64>)
-        acquires ManagedFungibleAsset, BucketStore, BucketCore {
-        assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
-        assert!(vector::length(&receiver_vec) == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
-        let len = vector::length(&receiver_vec);
-        let i = 0;
-        loop {
-            let to = vector::borrow(&receiver_vec, i);
-            let amount = vector::borrow(&amount_vec, i);
-            transfer(admin, from, *to, *amount);
-            i = i + 1;
-            if (i >= len) break;
-        }
-    }
-
     /**
      * @dev Transfers rewards from the sender's bucket to the recipient's bucket.
      * Only the address with the ADMIN_TRANSFER_ROLE can call this function.
@@ -542,6 +511,137 @@ module FACoin::fa_coin {
             assert!(has_bucket_store(*to), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
             let amount = vector::borrow(&amount_vec, i);
             admin_transfer_reward3_to_user_bucket_internal(admin, *to, *amount, 2);
+            i = i + 1;
+            if (i >= len) break;
+        }
+    }
+
+    /* -----  Only admin can invoke these fun ----- */
+
+    /// Transfer as the owner of metadata object ignoring `frozen` field.
+    public entry fun transfer(admin: &signer, from: &signer, to: address, amount: u64) 
+        acquires ManagedFungibleAsset, BucketStore, BucketCore  {
+        assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        // First transfer from the buckets
+        transfer_rewards_from_sender_to_receiver(signer::address_of(from), to, amount);
+        transfer_internal(admin, signer::address_of(from), to, amount);
+    }
+
+    /// Trasnfer in bulk as the owner of metadata object ignoring `frozen` field.
+    /**
+     * @dev Performs bulk transfer of KCash tokens to multiple accounts.
+     * @param accounts The array of recipient addresses.
+     * @param amounts The array of corresponding transfer amounts.
+     * @return A boolean indicating the success of the bulk transfer operation.
+    */
+    public entry fun bulk_transfer(admin: &signer, from: &signer, receiver_vec: vector<address>, amount_vec: vector<u64>)
+        acquires ManagedFungibleAsset, BucketStore, BucketCore {
+        assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        assert!(vector::length(&receiver_vec) == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let len = vector::length(&receiver_vec);
+        let i = 0;
+        loop {
+            let to = vector::borrow(&receiver_vec, i);
+            let amount = vector::borrow(&amount_vec, i);
+            transfer(admin, from, *to, *amount);
+            i = i + 1;
+            if (i >= len) break;
+        }
+    }
+
+    /**
+     * @dev Transfers tokens to the reward3 bucket of the recipient address.
+     * @param to The address to transfer the tokens to.
+     * @param _bucket The vec containing the token amounts to transfer.
+    */
+    public entry fun transfer_to_reward3(admin: &signer, sender: &signer, to: address, bucket: vector<u64>) acquires ManagedFungibleAsset, BucketCore, BucketStore{
+        assert!(has_bucket_store(signer::address_of(sender)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        let (r1, r2, r3) = (vector::borrow(&bucket, 0), vector::borrow(&bucket, 1), vector::borrow(&bucket, 2));
+        let amount = *r1 + *r2 + *r3;
+        let token_address = get_bucket_user_address(&signer::address_of(sender));
+        let bucketSender = borrow_global_mut<BucketStore>(token_address);
+        assert!(bucketSender.reward1 >= *r1, error::invalid_argument(EAMOUNT_SHOULD_BE_EQUAL_OR_LESS_THAN_BUCKET_ASSETS));
+        assert!(bucketSender.reward2 >= *r2, error::invalid_argument(EAMOUNT_SHOULD_BE_EQUAL_OR_LESS_THAN_BUCKET_ASSETS));
+        assert!(bucketSender.reward3 >= *r3, error::invalid_argument(EAMOUNT_SHOULD_BE_EQUAL_OR_LESS_THAN_BUCKET_ASSETS));
+        if (amount == *r1) {
+            bucketSender.reward1 = bucketSender.reward1 - *r1;
+        } else {
+            if (*r1 != 0) {
+                bucketSender.reward1 = bucketSender.reward1 - *r1;
+            };
+            if (*r2 != 0) {
+                bucketSender.reward2 = bucketSender.reward2 - *r2;
+            };
+            if (*r3 != 0) {
+                bucketSender.reward3 = bucketSender.reward3 - *r3;
+            }
+        };
+
+        deposit_to_bucket(to, 0, 0, amount);
+        transfer_internal(admin, signer::address_of(sender), to, amount);
+        event::emit(TransferBetweenBuckets { sender: signer::address_of(sender), receiver: to,  transfered_amount: amount });
+    }
+
+    /**
+     * @dev Transfers tokens to multiple addresses and assigns them to corresponding reward3 buckets.
+     * @param to_vec The vec of addresses to transfer tokens to.
+     * @param bucket_vec The vec of vec of reward3 buckets to assign to each address.
+     * Requirements:
+     * - The length of `to_vec` vec must be equal to the length of `bucket_vec` vec.
+    */
+    public entry fun transfer_to_reward3_bulk(admin: &signer, sender: &signer, to_vec: vector<address>, bucket_vec: vector<vector<u64>>) acquires ManagedFungibleAsset, BucketCore, BucketStore{
+        let len = vector::length(&to_vec);
+        assert!(len == vector::length(&bucket_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let i = 0;
+        loop {
+            let to = vector::borrow(&to_vec, i);
+            let bucket = vector::borrow(&bucket_vec, i);
+            transfer_to_reward3(admin, sender, *to, *bucket);
+            i = i + 1;
+            if (i >= len) break;
+        }
+
+    }
+
+    /**
+     * @dev Transfers a specified amount of reward3 tokens from the sender's bucket to the recipient's bucket.
+     * Emits a Transfer event.
+     *
+     * Requirements:
+     * - The sender must have a sufficient balance of reward3 tokens in their bucket.
+     *
+     * @param to The address of the recipient.
+     * @param amount The amount of reward3 tokens to transfer.
+    */
+    public entry fun transfer_reward3_to_reward3 (admin: &signer, from: &signer, to: address, amount: u64) acquires ManagedFungibleAsset, BucketCore, BucketStore{
+        assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
+        let token_address = get_bucket_user_address(&signer::address_of(from));
+        let bucketSender = borrow_global_mut<BucketStore>(token_address);
+        assert!(bucketSender.reward3 >= amount, error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        bucketSender.reward3 = bucketSender.reward3 - amount;
+
+        deposit_to_bucket(to, 0, 0, amount);
+        transfer_internal(admin, signer::address_of(from), to, amount);
+        event::emit(TransferBetweenBuckets { sender: signer::address_of(from), receiver: to,  transfered_amount: amount });
+    }
+
+    /**
+     * @dev Transfers multiple amounts of Reward3 tokens to multiple addresses.
+     * @param to_vec A vector of addresses to transfer the tokens to.
+     * @param amount_vec A vector of amounts to be transferred to each address.
+     * Requirements:
+     * - The `to_vec` and `to_vec` vectors must have the same length.
+     * - The caller must have sufficient balance of Reward3 tokens.
+    */
+    public entry fun transfer_reward3_to_reward3_bulk (admin: &signer, from: &signer, to_vec: vector<address>, amount_vec: vector<u64>) 
+        acquires ManagedFungibleAsset, BucketCore, BucketStore{
+        let len = vector::length(&to_vec);
+        assert!(len == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let i = 0;
+        loop {
+            let to = vector::borrow(&to_vec, i);
+            let amount = vector::borrow(&amount_vec, i);
+            transfer_reward3_to_reward3(admin, from, *to, *amount);
             i = i + 1;
             if (i >= len) break;
         }

@@ -161,38 +161,33 @@ export async function transferCoinBulk(
 }
 
 
-// export async function adminTransfer(
-//   admin: Account,
-//   toAddress:AccountAddress,
-//   from:AccountAddress,
-//   receiver: AccountAddress,
-// ): Promise<string> {
-//   const transaction = await aptos.transaction.build.multiAgent({
-//     sender: admin.accountAddress,
-//     data: {
-//       function: `${admin.accountAddress}::fa_coin::admin_transfer`,
-//       functionArguments: [toAddress, from,receiver],
-//     },
-//     secondarySignerAddresses: [from],
-//   });
+export async function admin_transfer(
+  admin: Account,
+  toAddress:AccountAddress,
+  deductionFromSender:AnyNumber[],
+  additionToRecipient:AnyNumber[],
+): Promise<string> {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${admin.accountAddress}::fa_coin::admin_transfer`,
+      functionArguments: [toAddress, deductionFromSender, additionToRecipient],
+    }
+  });
 
-//   const senderAuthenticator = await aptos.transaction.sign({
-//     signer: admin,
-//     transaction,
-//   });
-//   const senderAuthenticator2 = await aptos.transaction.sign({
-//     signer: toAddress,
-//     transaction,
-//   });
-//   const pendingTxn = await aptos.transaction.submit.multiAgent({
-//     transaction,
-//     senderAuthenticator,
-//     additionalSignersAuthenticators: [senderAuthenticator2]
+  const senderAuthenticator = await aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+ 
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
     
-//   });
-//   await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
-//   return pendingTxn.hash;
-// }
+  });
+  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
+  return pendingTxn.hash;
+}
 
 
 
@@ -618,22 +613,22 @@ async function main() {
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////
   
-  console.log("\nOwner mints 1000 kcash in his own account");
+  // console.log("\nOwner mints 1000 kcash in his own account");
 
-  let owner_mint = 1000 * decimal_kcash;
-  let mTx = await mintCoin(
-    owner,
-    user1,
-    owner_mint,
-    owner_mint * 0.1,
-    owner_mint * 0.2,
-    owner_mint * 0.7
-  );
-  await aptos.waitForTransaction({ transactionHash: mTx });
-  console.log("🚀 ~ mTx:", mTx);
+  // let owner_mint = 1000 * decimal_kcash;
+  // let mTx = await mintCoin(
+  //   owner,
+  //   user1,
+  //   owner_mint,
+  //   owner_mint * 0.1,
+  //   owner_mint * 0.2,
+  //   owner_mint * 0.7
+  // );
+  // await aptos.waitForTransaction({ transactionHash: mTx });
+  // console.log("🚀 ~ mTx:", mTx);
 
-  console.log(`Owner's KCash balance after mint: ${await getFaBalance(owner,metadataAddress)}.`);
-  console.log("Owner bucket store :", await getBucketStore(owner));
+  // console.log(`Owner's KCash balance after mint: ${await getFaBalance(owner,metadataAddress)}.`);
+  // console.log("Owner bucket store :", await getBucketStore(owner));
 
 
 
@@ -902,22 +897,22 @@ async function main() {
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-  console.log("🚀 ~ main ~ bulktransferTx:");
+  // console.log("🚀 ~ main ~ bulktransferTx:");
 
   // console.log("🚀 ~ main ~ user1 before bucket :", await getBucketStore(user1));
   // console.log("🚀 ~ main ~ user2 before bucket :", await getBucketStore(user2));
-   let receiver_ar1 =[owner.accountAddress, user2.accountAddress]
-   let amount_to_mint_owner = 100 * decimal_kcash;
-   let amount_to_mint_user = amount_to_mint_owner / 2;
-   let amount_ar1 = [amount_to_mint_owner, amount_to_mint_user];
-  let transferbulkTx = await transferCoinBulk(
-    owner,
-    user1,
-    receiver_ar1,
-    amount_ar1
-  );
-  await aptos.waitForTransaction({ transactionHash: transferbulkTx });
-  console.log("🚀 ~ main ~ transferTx:", transferbulkTx);
+  //  let receiver_ar1 =[owner.accountAddress, user2.accountAddress]
+  //  let amount_to_mint_owner = 100 * decimal_kcash;
+  //  let amount_to_mint_user = amount_to_mint_owner / 2;
+  //  let amount_ar1 = [amount_to_mint_owner, amount_to_mint_user];
+  // let transferbulkTx = await transferCoinBulk(
+  //   owner,
+  //   user1,
+  //   receiver_ar1,
+  //   amount_ar1
+  // );
+  // await aptos.waitForTransaction({ transactionHash: transferbulkTx });
+  // console.log("🚀 ~ main ~ transferTx:", transferbulkTx);
 
   // console.log("Now owner blance :" , await getFaBalance(owner,metadataAddress));
   // console.log("Now user1 blance :" , await getFaBalance(user1,metadataAddress));
@@ -932,11 +927,61 @@ async function main() {
 
 
 
+  // Admin Transfer coin
+
+  console.log("🚀 ~ main ~Admin transferTx:");
+
+  console.log("🚀 ~ main ~ owner before bucket :", await getBucketStore(owner));
+  console.log("🚀 ~ main ~ user1 before bucket :", await getBucketStore(user1));
+
+  let dedec_from_sen=[30,20,20]
+  let reci_add=[40,30,0]
+  let transferAdminTx = await admin_transfer(
+    owner,
+    user1.accountAddress,
+    dedec_from_sen,
+    reci_add,
+  );
+  await aptos.waitForTransaction({ transactionHash: transferAdminTx });
+  console.log("🚀 ~ main ~ transferTx:", transferAdminTx);
+
+  console.log("Now owner blance :" , await getFaBalance(owner,metadataAddress));
+  console.log("Now user1 blance :" , await getFaBalance(user1,metadataAddress));
+  console.log("🚀 ~ main ~ owner bucket :", await getBucketStore(owner));
+  console.log("🚀 ~ main ~ user1 bucket :", await getBucketStore(user1));
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
   // console.log(
   //   "--------Now try to transfer the funds using native transfer method-------------"
   // );

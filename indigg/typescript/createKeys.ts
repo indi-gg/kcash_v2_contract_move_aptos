@@ -35,23 +35,23 @@ async function fundWallet(alice: AccountAddress) {
 async function main() {
   let owner = await createWallet();
   fs.writeFileSync("./keys/owner.json", JSON.stringify(owner));
-  let user = await createWallet();
-  fs.writeFileSync("./keys/user.json", JSON.stringify(user));
+  let user1 = await createWallet();
+  fs.writeFileSync("./keys/user.json", JSON.stringify(user1));
 
   let user2 = await createWallet();
   fs.writeFileSync("./keys/user2.json", JSON.stringify(user2));
 
-  let own = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
-  await fundWallet(own.accountAddress);
-  console.log("🚀 ~ main ~ own.accountAddress:", own.accountAddress);
+  let ownerAcc = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
+  await fundWallet(ownerAcc.accountAddress);
+  console.log("🚀 ~ main ~ own.accountAddress:", ownerAcc.accountAddress);
 
-  let use = JSON.parse(fs.readFileSync("./keys/user.json", "utf8"));
-  await fundWallet(use.accountAddress);
-  console.log("🚀 ~ main ~ use.accountAddress:", use.accountAddress);
+  let user1Acc = JSON.parse(fs.readFileSync("./keys/user.json", "utf8"));
+  await fundWallet(user1Acc.accountAddress);
+  console.log("🚀 ~ main ~ use.accountAddress:", user1Acc.accountAddress);
 
-  let use2 = JSON.parse(fs.readFileSync("./keys/user2.json", "utf8"));
-  await fundWallet(use2.accountAddress);
-  console.log("🚀 ~ main ~ se2.accountAddress:", use2.accountAddress);
+  let user2Acc = JSON.parse(fs.readFileSync("./keys/user2.json", "utf8"));
+  await fundWallet(user2Acc.accountAddress);
+  console.log("🚀 ~ main ~ se2.accountAddress:", user2Acc.accountAddress);
 }
 
 main();

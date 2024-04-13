@@ -103,6 +103,28 @@ async function signatureVerification(
   return pendingTxn.hash;
 }
 
+// Admin Transfer with Signature
+export async function adminTransferWithSignature(admin: Account, toAddress: AccountAddress, deductionFromSender: AnyNumber[], additionToRecipient: AnyNumber[], signature: Ed25519Signature, message: Uint8Array): Promise<string> {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${admin.accountAddress}::fa_coin::admin_transfer_with_signature`,
+      functionArguments: [toAddress, deductionFromSender, additionToRecipient, signature.toUint8Array(), message],
+    },
+  });
+  const senderAuthenticator = await aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
+  });
+
+  return pendingTxn.hash;
+}
+
+
 /** Admin forcefully transfers the newly created coin to the specified receiver address */
 export async function transferCoin(
   admin: Account,
@@ -494,7 +516,6 @@ export async function unfreeze(
   });
 
   return pendingTxn.hash;
-  return pendingTxn.hash;
 }
 
 export const getFaBalance = async (
@@ -560,6 +581,19 @@ export async function getMetadata(admin: Account) {
   console.log("🚀 ~ getMetadata ~ res:", res);
   return res.inner;
 }
+
+export async function getPublicKey(admin: Account) {
+  // console.log(`Request for metadata for admin account ${admin} received.`);
+
+  const payload: InputViewFunctionData = {
+    function: `${admin.accountAddress}::fa_coin::get_public_key`,
+    functionArguments: [],
+  };
+  const res = (await aptos.view({ payload }))[0];
+  console.log("🚀 ~ getPublicKey ~ res:", res);
+  return res.toString();
+}
+
 
 async function hasBucket(admin: AccountAddress) {
   const payload: InputViewFunctionData = {
@@ -797,6 +831,8 @@ export async function transferFromReward3ToReward3(
 }
 
 async function main() {
+  await aptos.fundAccount({accountAddress: owner.accountAddress, amount: 100000000});
+
   console.log("\n=== Addresses ===");
   console.log(`Owner: ${owner.accountAddress.toString()}`);
   console.log(`User1: ${user1.accountAddress.toString()}`);
@@ -1298,18 +1334,27 @@ async function main() {
   //     )}.`
   //   );
 
-  // const signature = await signMessage(privateKeyOwner, messageHash);
-  // console.log("=============================================");
-  // console.log("Signature: ", signature.toString());
-  // console.log("=============================================");
+  // Signing a Message
+  const signature = await signMessage(privateKeyOwner, messageHash);
+  console.log("=============================================");
+  console.log("Signature: ", signature.toString());
+  console.log("=============================================");
 
-  // const sigVerifyTransaction = signatureVerification(
-  //   message,
-  //   publicKeyOwner.toUint8Array(),
-  //   signature,
-  //   owner
-  // );
+  // Verifying Signature
+  // const sigVerifyTransaction = signatureVerification(message, publicKeyOwner.toUint8Array(), signature, owner);
   // console.log("Signature transaction", sigVerifyTransaction);
+
+  // const publicKey = getPublicKey(owner);
+  // console.log("🚀 ~ publicKey:", publicKey);
+  console.log("PublicKey Off-Chain: ", publicKeyOwner.toUint8Array());
+
+  // Admin Transfer with Signature
+  let adminSignatureTx = await adminTransferWithSignature(owner, user2.accountAddress, [1, 2, 3], [3, 1, 2], signature, message);
+  console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
+
+
+
+
 
   console.log("done.");
 }

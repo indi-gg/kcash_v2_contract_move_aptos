@@ -41,6 +41,9 @@ async function main() {
   let user2 = await createWallet();
   fs.writeFileSync("./keys/user2.json", JSON.stringify(user2));
 
+  let signer = await createWallet();
+  fs.writeFileSync("./keys/signer.json", JSON.stringify(signer));
+
   let ownerAcc = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
   await fundWallet(ownerAcc.accountAddress);
   console.log("🚀 ~ main ~ own.accountAddress:", ownerAcc.accountAddress);
@@ -52,6 +55,10 @@ async function main() {
   let user2Acc = JSON.parse(fs.readFileSync("./keys/user2.json", "utf8"));
   await fundWallet(user2Acc.accountAddress);
   console.log("🚀 ~ main ~ se2.accountAddress:", user2Acc.accountAddress);
+
+  let signerAcc = JSON.parse(fs.readFileSync("./keys/signer.json", "utf8"));
+  await fundWallet(signerAcc.accountAddress);
+  console.log("🚀 ~ main ~ se2.accountAddress:", signerAcc.accountAddress);
 }
 
 main();

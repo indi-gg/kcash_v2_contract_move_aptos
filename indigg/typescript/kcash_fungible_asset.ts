@@ -2,6 +2,7 @@
 /* eslint-disable max-len */
 
 import {
+  MoveStruct, MoveStructField,MoveScriptBytecode,MoveStructId,Serializable,Serializer,
   Account,
   AccountAddress,
   AnyNumber,
@@ -12,8 +13,16 @@ import {
   NetworkToNetworkName,
   Ed25519PrivateKey,
   Ed25519PublicKey,
-  Ed25519Signature
+  Ed25519Signature,
+  Ed25519Account,
+  Uint64
 } from "@aptos-labs/ts-sdk";
+
+//import {bcs} from "@aptos-labs/ts-sdk/src/bcs/";
+
+//import { bcs } from "@aptos-labs/ts-sdk";
+
+//import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from "aptos";
 import { compilePackage, getPackageBytesToPublish } from "./utils";
 import fs from "fs";
 import sha256 from "fast-sha256";
@@ -30,7 +39,7 @@ import sha256 from "fast-sha256";
  */
 
 // Setup the client
-const APTOS_NETWORK: Network = NetworkToNetworkName[Network.DEVNET];
+const APTOS_NETWORK: Network = NetworkToNetworkName[Network.TESTNET];
 console.log("APTOS_NETWORK3000", APTOS_NETWORK);
 
 const config = new AptosConfig({ network: APTOS_NETWORK });
@@ -41,6 +50,50 @@ const output_file_path = "move/facoin/facoin.json"; // Path to JSON file
 const address_name = "FACoin"; // Address name from move.toml
 const decimal_kcash = 1;
 console.log("🚀 ~ decimal_kcash:", decimal_kcash);
+
+// Define the MoveStruct class that implements the Serializable interface
+ class MessageMoveStruct extends Serializable {
+     constructor(
+      
+         public from: AccountAddress, // where AccountAddress extends Serializable
+         public to: AccountAddress, // where AccountAddress extends Serializable
+         public deductionFromSender: Uint64[],
+         public additionToRecipient: Uint64[]
+     ) {super()}
+
+     serialize(serializer: Serializer): void {
+         serializer.serialize(this.from);  // Composable serialization of another Serializable object
+         serializer.serialize(this.to);
+         //serializer.serializeVector(this.deductionFromSender)
+         //serializer.serializeU64(this.deductionFromSender);
+         // TODO: Add correct serializer
+     }
+ }
+
+ // Construct a MoveStruct
+ //const moveStruct = new MessageMoveStruct(new AccountAddress(...), "MyCollection", "TokenA");
+ //moveStruct.bcsToBytes();
+ 
+interface IMessage {
+  from:  AccountAddress;
+  to: AccountAddress;
+  deductionFromSender: {
+      reward1: number;
+      reward2: number;
+      reward3: number;
+  };
+  additionToRecipient: {
+      reward1: number;
+      reward2: number;
+      reward3: number;
+  };
+}
+
+// MoveStruct {
+
+// }
+
+
 
 // const owner_amount_to_mint = 1000*decimal_kcash;
 // const amount_to_mint = 10000000000;
@@ -59,9 +112,42 @@ let user2_kp = JSON.parse(fs.readFileSync("./keys/user2.json", "utf8"));
 const privateKeyuser2 = new Ed25519PrivateKey(user2_kp.privateKey);
 const user2 = Account.fromPrivateKey({ privateKey: privateKeyuser2 });
 
+let message1: IMessage = {
+  from: user1.accountAddress,
+  to: user2.accountAddress,
+  deductionFromSender: {
+      reward1: 10,
+      reward2: 20,
+      reward3: 30
+  },
+  additionToRecipient: {
+      reward1: 5,
+      reward2: 15,
+      reward3: 25
+  }
+};
+
+
+// let moveStructInstance:MoveStruct ={
+//   name:"abc",
+//   fields:[ ]
+// };
+
+// Convert message1 to JSON string
+// const jsonString: string = JSON.stringify(message1);
+
+// const encoder = new TextEncoder();
+// const msgBytes: Uint8Array = encoder.encode(message1.toString());
+// const msgBytes = bcsTobytes(message1);
+//Serializer.bcsToBytes(message1);
+//const bytes: Uint8Array = bcs.serialize(message1);
+
+
 // Message & Hash
 const message = new Uint8Array(Buffer.from("KCash"));
 const messageHash = sha256(message);
+//const messageHash1 = sha256(msgBytes);
+
 
 // Signature Method : Sign a message through PrivateKey
 async function signMessage(privateKey: Ed25519PrivateKey, messageHash: Uint8Array,): Promise<Ed25519Signature> {
@@ -88,12 +174,12 @@ async function signatureVerification(message: Uint8Array, public_key: Uint8Array
 }
 
 // Admin Transfer with Signature
-export async function adminTransferWithSignature(admin: Account, toAddress: AccountAddress, deductionFromSender: AnyNumber[], additionToRecipient: AnyNumber[], signature: Ed25519Signature, message: Uint8Array): Promise<string> {
+export async function adminTransferWithSignature(admin: Account, toAddress: AccountAddress, deductionFromSender: AnyNumber[], additionToRecipient: AnyNumber[], signature: Ed25519Signature): Promise<string> {
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
       function: `${admin.accountAddress}::fa_coin::admin_transfer_with_signature`,
-      functionArguments: [toAddress, deductionFromSender, additionToRecipient, signature.toUint8Array(), message],
+      functionArguments: [toAddress, deductionFromSender, additionToRecipient, signature.toUint8Array()],
     },
   });
   const senderAuthenticator = await aptos.transaction.sign({
@@ -440,19 +526,6 @@ export async function getMetadata(admin: Account) {
   return res.inner;
 }
 
-export async function getPublicKey(admin: Account) {
-  // console.log(`Request for metadata for admin account ${admin} received.`);
-
-  const payload: InputViewFunctionData = {
-    function: `${admin.accountAddress}::fa_coin::get_public_key`,
-    functionArguments: [],
-  };
-  const res = (await aptos.view({ payload }))[0];
-  console.log("🚀 ~ getPublicKey ~ res:", res);
-  return res.toString();
-}
-
-
 async function hasBucket(admin: AccountAddress) {
   const payload: InputViewFunctionData = {
     function: `${owner.accountAddress}::fa_coin::has_bucket_store`, //
@@ -500,7 +573,8 @@ async function hasBucket(admin: AccountAddress) {
 }
 
 async function main() {
-  await aptos.fundAccount({accountAddress: owner.accountAddress, amount: 100000000});
+  // await aptos.fundAccount({accountAddress: owner.accountAddress, amount: 100000000});
+  console.log("🚀 ~ messageHash1:", messageHash.toString());
 
   console.log("\n=== Addresses ===");
   console.log(`Owner: ${owner.accountAddress.toString()}`);
@@ -683,12 +757,10 @@ async function main() {
   // const sigVerifyTransaction = signatureVerification(message, publicKeyOwner.toUint8Array(), signature, owner);
   // console.log("Signature transaction", sigVerifyTransaction);
 
-  // const publicKey = getPublicKey(owner);
-  // console.log("🚀 ~ publicKey:", publicKey);
   console.log("PublicKey Off-Chain: ", publicKeyOwner.toUint8Array());
 
   // Admin Transfer with Signature
-  let adminSignatureTx = await adminTransferWithSignature(owner, user2.accountAddress, [1, 2, 3], [3, 1, 2], signature, message);
+  let adminSignatureTx = await adminTransferWithSignature(owner, user2.accountAddress, [1, 2, 3], [3, 1, 2], signature);
   console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
 
 

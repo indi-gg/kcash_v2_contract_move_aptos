@@ -16,6 +16,7 @@ module FACoin::fa_coin {
     use std::vector;
     use aptos_std::ed25519;
     use aptos_std::hash;
+    use std::bcs;
 
 
     /// Only fungible asset metadata owner can make changes.
@@ -26,11 +27,13 @@ module FACoin::fa_coin {
     const EUSER_ALREADY_HAS_BUCKET_STORE: u64 = 5;
     const EINVALID_ARGUMENTS_LENGTH: u64 = 6;
 
-    const PUBLIC_KEY: vector<u8> = x"da5ce0d82dfebc6bc4149be8ede406733cb81da905e1ac623bea3b5b723ee689";
+    const PUBLIC_KEY: vector<u8> = x"4015be72e8aac76401ea951ad7c97009f971e63b6f679495cc023b79c2c91f64";
     const ASSET_SYMBOL: vector<u8> = b"FA";
     const BUCKET_CORE_SEED: vector<u8> = b"BA";
     const BUCKET_COLLECTION_DESCRIPTION: vector<u8> = b"Bucket collections";
     const BUCKET_COLLECTION_NAME: vector<u8> = b"Bucket store";
+
+
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
@@ -90,29 +93,14 @@ module FACoin::fa_coin {
 
     }
 
-    // struct Message has drop, store {
-    //     m: "KCash",
-    // }
+    #[event]
+    struct MessageHash has drop, store{
+        message: AdminTransferSignature,
+        messag_bytes: vector<u8>,
+        message_hash: vector<u8>,
+        is_signature_valid: bool
 
-    // #[event]
-    // struct VectorToString has drop, store{
-    //     message: String
-    // }
-
-    // public entry fun convert_message_bytes_into_message_string(message : vector<u8>) {
-   
-    //     // debug::print(&message); 
-    //     // debug::print(&utf8(message)); 
-
-    //     // Convert the vector<u8> to a ByteArray
-    //     let byte_array: bytearray = ByteArray::from_vector(message);
-    
-    //     // Convert the ByteArray to a string
-    //     let str_result: string = ByteArray::toString(byte_array);
-
-    //     event::emit<VectorToString>(VectorToString{str_result});
-
-    // }
+    }
 
     // to check if the address is of admin
     fun is_owner(owner: address) : bool{
@@ -169,9 +157,9 @@ module FACoin::fa_coin {
 
 
     // Verify signature
-    fun signature_verification(message: vector<u8>, signature: vector<u8>): bool{
+    fun signature_verification(messageHash: vector<u8>, signature: vector<u8>): bool{
         // Generating Message Hash using sha2_256
-        let messageHash = hash::sha2_256(message);
+        //let messageHash = hash::sha2_256(message);
 
         // Converting Public Key Bytes into UnValidated Public Key
         let unValidatedPublickkey = ed25519:: new_unvalidated_public_key_from_bytes(PUBLIC_KEY);
@@ -187,20 +175,48 @@ module FACoin::fa_coin {
         return result
     }
 
+        
+    struct AdminTransferSignature has drop, store {
+        from: address,
+        to: address,
+        deductionFromSender: vector<u64>,
+        additionToRecipient: vector<u64>
+    }
+
+   
+
     // Admin Transfers with Signature
-    public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductionFromSender: vector<u64>, additionToRecipient: vector<u64>, signature: vector<u8>, message: vector<u8>) acquires ManagedFungibleAsset, BucketStore, BucketCore {
+    public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductnFromSender: vector<u64>, additnToRecipient: vector<u64>, signature: vector<u8>) acquires ManagedFungibleAsset, BucketStore, BucketCore {
+
+        let message = AdminTransferSignature{
+            from: signer::address_of(admin),
+            to: to,
+            deductionFromSender: deductnFromSender,
+            additionToRecipient: additnToRecipient
+        };
+        
+        let messag_bytes = bcs::to_bytes<AdminTransferSignature>(&message);
+        let message_hash = hash::sha2_256(messag_bytes);
+
+
+
         // Verify designated signer with signature
-        let is_signature_valid = signature_verification(message, signature);
+        let is_signature_valid = signature_verification(message_hash, signature);
+
+        event::emit<MessageHash>(MessageHash{message, messag_bytes, message_hash, is_signature_valid});
 
         if(is_signature_valid == true) {
             assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
-            assert!(vector::length(&deductionFromSender) == vector::length(&additionToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
-            let (r1, r2, r3) = (*vector::borrow(&deductionFromSender, 0), *vector::borrow(&deductionFromSender, 1), *vector::borrow(&deductionFromSender, 2));
+            assert!(vector::length(&deductnFromSender) == vector::length(&additnToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+            let (r1, r2, r3) = (*vector::borrow(&deductnFromSender, 0), *vector::borrow(&deductnFromSender, 1), *vector::borrow(&deductnFromSender, 2));
             withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
-            deposit_to_bucket(to, *vector::borrow(&additionToRecipient, 0), *vector::borrow(&additionToRecipient, 1), *vector::borrow(&additionToRecipient, 2));
+            deposit_to_bucket(to, *vector::borrow(&additnToRecipient, 0), *vector::borrow(&additnToRecipient, 1), *vector::borrow(&additnToRecipient, 2));
             transfer_internal(admin, signer::address_of(admin), to, r1+r2+r3);
         }
+
     }
+
+ 
 
     
 
@@ -289,12 +305,6 @@ module FACoin::fa_coin {
             create_bucket_store(user);
         }
     }
-
-    // #[view]
-    // public fun get_public_key(str: &string::String): vector<u8> {
-    // //    PUBLIC_KEY
-    //     &str.bytes
-    // }
 
     #[view]
     public fun has_bucket_store(owner_addr: address): (bool) {
@@ -665,7 +675,7 @@ module FACoin::fa_coin {
         assert!(primary_fungible_store::balance(creator_address, asset) == 100, 4);
         freeze_account(creator, creator_address);
         assert!(primary_fungible_store::is_frozen(creator_address, asset), 5);
-        transfer(creator, creator_address, aaron_address, 10);
+        // transfer(creator, creator_address, aaron_address, 10);
         assert!(primary_fungible_store::balance(aaron_address, asset) == 10, 6);
 
         unfreeze_account(creator, creator_address);

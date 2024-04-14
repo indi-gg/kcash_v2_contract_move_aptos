@@ -444,7 +444,7 @@ export async function bulkMintCoin(
     transaction,
     senderAuthenticator,
   });
-
+  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
   return pendingTxn.hash;
 }
 
@@ -470,6 +470,7 @@ export async function burnCoin(
       transaction,
       senderAuthenticator,
     });
+    await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
     return pendingTxn.hash;
   } catch (error) {
     console.log("Error while burning coins:", error);
@@ -580,7 +581,6 @@ export const getIs_freez = async (
     });
 
     console.log("data ---", data);
-
     // console.log(`Successfully retrieved balance data:`, data);
 
     return data[0]?.is_frozen ?? false;
@@ -1006,12 +1006,12 @@ async function main() {
   console.log(`User1: ${user1.accountAddress.toString()}`);
   console.log(`User2: ${user2.accountAddress.toString()}`);
 
-  // let deployedTx = await compileAndDeploy();
-  // console.log("🚀 ~ main ~ deployedTx:", deployedTx);
+  let deployedTx = await compileAndDeploy();
+  console.log("🚀 ~ main ~ deployedTx:", deployedTx);
 
-  // const metadata = await getMetadata(owner);
-  // let metadataAddress = metadata.toString();
-  // console.log("metadata address:", metadataAddress);
+  const metadata = await getMetadata(owner);
+  let metadataAddress = metadata.toString();
+  console.log("metadata address:", metadataAddress);
 
   // console.log("*** Signture verify ***");
 
@@ -1030,7 +1030,7 @@ async function main() {
   let user_mint = 100 * decimal_kcash;
   // let mTx = await mintCoin(
   //   owner,
-  //   owner,
+  //   user2,
   //   owner_mint,
   //   owner_mint * 0.1,
   //   owner_mint * 0.2,
@@ -1157,6 +1157,22 @@ async function main() {
   // console.log("User1 bucket store :", await getBucketStore(user1));
   // console.log("User2 bucket store :", await getBucketStore(user2));
   // console.log("owner bucket store :", await getBucketStore(owner));
+  // let transactionBulk3 = await adminTransferBulk(
+  //   owner,
+  //   [user2.accountAddress, user1.accountAddress],
+  //   [
+  //     [1, 2, 3],
+  //     [4, 5, 3],
+  //   ],
+  //   [
+  //     [3, 1, 2],
+  //     [6, 0, 6],
+  //   ]
+  // );
+  // console.log("🚀 ~ bulkTx3:", transactionBulk3);
+  // console.log("User1 bucket store :", await getBucketStore(user1));
+  // console.log("User2 bucket store :", await getBucketStore(user2));
+  // console.log("owner bucket store :", await getBucketStore(owner));
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1188,7 +1204,11 @@ async function main() {
   //     )}.`
   //   );
   //   console.log("User1 bucket store :", await getBucketStore(user1));
-  // console.log(
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+  
+// console.log(
   //   "\n Owner transfers from 10 kcash from his bucket3 to user2's bucket1"
   // );
   // console.log("ownerbuket", await getBucketStore(owner));
@@ -1729,19 +1749,17 @@ async function main() {
 
   // Signing a Message
   const signature = await signMessage(privateKeyOwner, messageHash);
-  // console.log("=============================================");
-  // console.log("Signature: ", signature.toString());
-  // console.log("=============================================");
+  console.log("=============================================");
+  console.log("Signature: ", signature.toString());
+  console.log("=============================================");
 
-  // const sigVerifyTransaction = signatureVerification(
-  //   message,
-  //   publicKeyOwner.toUint8Array(),
-    //   signature,
-  //   message
-  // );
-  // console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
+  // // Verifying Signature
+  // const sigVerifyTransaction = signatureVerification(message, publicKeyOwner.toUint8Array(), signature, owner);
+  // console.log("Signature transaction", sigVerifyTransaction);
 
-  console.log(" Functions that require signatures");
+  // const publicKey = getPublicKey(owner);
+  // console.log("🚀 ~ publicKey:", publicKey);
+  // console.log("PublicKey Off-Chain: ", publicKeyOwner.toUint8Array());
 
   let nonce = await getNonce(owner);
   console.log("🚀 ~ nonce:", nonce);

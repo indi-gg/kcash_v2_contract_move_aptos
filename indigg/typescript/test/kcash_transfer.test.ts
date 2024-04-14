@@ -44,38 +44,53 @@ import {
 import sha256 from "fast-sha256";
 import { compilePackage, getPackageBytesToPublish } from "../utils";
 import { get } from "https";
+import fs from "fs";
 
 const APTOS_NETWORK: Network = NetworkToNetworkName[Network.DEVNET];
-console.log("APTOS_NETWORK3000", APTOS_NETWORK);
+// console.log("APTOS_NETWORK3000", APTOS_NETWORK);
 
 const config = new AptosConfig({ network: APTOS_NETWORK });
 const aptos = new Aptos(config);
 
-let privateKeyOwner = new Ed25519PrivateKey(
-  "0xed23600433b37f7b621cb570179f59dcaa82aed02074271b50de3bfb49f68c18"
-);
+// let privateKeyOwner = new Ed25519PrivateKey(
+//   "0x7932f33ebcd9ac6424e6db08046e53ea57392d894310afa5da31abaafd31909b"
+// );
 
-let privateKeyBob = new Ed25519PrivateKey(
-  "0x75c1cdeb87899372d0c6dcc90487b2d72ea99867f6730334e8509b2ebd424921"
-);
+// let privateKeyBob = new Ed25519PrivateKey(
+//   "0xbc56550b09c8441834c49532c41e57f3471f6c7f4b7b7808b3c751c80c5865ad"
+// );
 
-let privateKeyCharlie = new Ed25519PrivateKey(
-  "0xee1e11714fe85e4a3fb5ef7a7bddad5d482870d7d98db6e2a1f9e7967830393c"
-);
+// let privateKeyCharlie = new Ed25519PrivateKey(
+//   "0x26ef94b01b340b897b4b162c2216c42320604fca62260674f85d07bc26191bdd"
+// );
 
-let owner = Account.fromPrivateKey({ privateKey: privateKeyOwner });
-let user1 = Account.fromPrivateKey({ privateKey: privateKeyBob });
-let user2 = Account.fromPrivateKey({ privateKey: privateKeyCharlie });
+// let owner = Account.fromPrivateKey({ privateKey: privateKeyOwner });
+// let user1 = Account.fromPrivateKey({ privateKey: privateKeyBob });
+// let user2 = Account.fromPrivateKey({ privateKey: privateKeyCharlie });
+
+let owner_kp = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
+const privateKeyOwner = new Ed25519PrivateKey(owner_kp.privateKey);
+const publicKeyOwner = new Ed25519PublicKey(owner_kp.publicKey);
+const owner = Account.fromPrivateKey({ privateKey: privateKeyOwner });
+
+let user_kp = JSON.parse(fs.readFileSync("./keys/user.json", "utf8"));
+const privateKeyuser1 = new Ed25519PrivateKey(user_kp.privateKey);
+const user1 = Account.fromPrivateKey({ privateKey: privateKeyuser1 });
+
+let user2_kp = JSON.parse(fs.readFileSync("./keys/user2.json", "utf8"));
+const privateKeyuser2 = new Ed25519PrivateKey(user2_kp.privateKey);
+const user2 = Account.fromPrivateKey({ privateKey: privateKeyuser2 });
 
 let metadataAddress: string;
+
 const decimal_kcash = 1;
-
-const amount_to_mint = 100000000000;
-const rewart1 = amount_to_mint * 0.5;
+const amount_to_mint = 1000 * decimal_kcash;
+const amount_To_Burn = 500 * decimal_kcash;
+const rewart1 = amount_to_mint * 0.1;
 const rewart2 = amount_to_mint * 0.2;
-const rewart3 = amount_to_mint * 0.3;
+const rewart3 = amount_to_mint * 0.7;
 
-const amount_to_be_transfer = 1000 * decimal_kcash;
+const amount_to_be_transfer = 500 * decimal_kcash;
 
 let amt2 = amount_to_mint / 2;
 let amount_ar = [amount_to_mint, amt2];
@@ -197,19 +212,13 @@ describe("Kcash Test", () => {
   describe("minting-burning-coin", () => {
     it("Mint Coins", async () => {
       try {
-        console.log("startminting....73");
         let metadataAddress = await getMetadata(owner);
-        console.log("metadata172", metadataAddress);
         let initialBalanceowner = await getFaBalance(
           owner,
           metadataAddress.toString()
         );
-        console.log("initialBalanceowner", initialBalanceowner);
         const bucketStore = await getBucketStore(owner);
-        console.log("bucketStore", bucketStore);
 
-        console.log("amount to be mint 100000000000");
-        // let result = await mintCoin(owner, owner, 100000000000000000);
         let mintCoinTransactionHash = await mintCoin(
           owner,
           owner,
@@ -224,24 +233,21 @@ describe("Kcash Test", () => {
           metadataAddress.toString()
         );
         const bucketStore_after_minting = await getBucketStore(owner);
-        console.log("bucketStore_after_minting", bucketStore_after_minting);
         expect(finalBalanceoner).toBe(initialBalanceowner + amount_to_mint);
-        console.log("initialBalanceAlice180", initialBalanceowner);
-        console.log("finalBalanceAlice1888", finalBalanceoner);
       } catch (error) {
         console.log("error", error);
       }
     });
 
-    it("Get Bucket Store", async () => {
-      try {
-        console.log("start fetching bucket store....");
-        const bucketStore = await getBucketStore(owner);
-        console.log("Bucket store:", bucketStore);
-      } catch (error) {
-        console.log("error", error);
-      }
-    });
+    // it("Get Bucket Store", async () => {
+    //   try {
+    //     console.log("start fetching bucket store....");
+    //     const bucketStore = await getBucketStore(owner);
+    //     console.log("Bucket store:", bucketStore);
+    //   } catch (error) {
+    //     console.log("error", error);
+    //   }
+    // });
 
     // it("Should revert if called by owner but bucket sum is not correct", async () => {
     //   // Simulate calling mintCoin with incorrect bucket sums
@@ -257,15 +263,15 @@ describe("Kcash Test", () => {
 
     it("Bulk Mint Coins", async () => {
       try {
-        console.log("start bulk minting....");
+        console.log("Start bulk minting....");
+
+        // Retrieve initial balances
         const metadata = await getMetadata(owner);
-        const get_owner_blance = await getFaBalance(owner, metadata.toString()); // befor builkmint owner balance
-        console.log("get_owner_blance", get_owner_blance);
-        const get_user1_blance = await getFaBalance(user1, metadata.toString()); //befor user1 blance
-        console.log("get_user1_blance", get_user1_blance);
-        const get_user2_blance = await getFaBalance(user2, metadata.toString()); // befor user2 blance
-        console.log("get_user2_blance", get_user2_blance);
-        let bulkMintTx = await bulkMintCoin(
+        const initialUser1Balance = await getFaBalance(user1, metadata.toString());
+        const initialUser2Balance = await getFaBalance(user2, metadata.toString());
+
+        // Perform bulk minting
+        const bulkMintTx = await bulkMintCoin(
           owner,
           receiver_ar,
           amount_ar,
@@ -273,62 +279,45 @@ describe("Kcash Test", () => {
           r2_ar,
           r3_ar
         );
-        console.log("bulkMintTx", bulkMintTx);
-        await aptos.waitForTransaction({ transactionHash: bulkMintTx });
-        console.log("🚀 ~ main ~ bulkMintTx:", bulkMintTx);
-        const get_owner_blance_after = await getFaBalance(
-          owner,
-          metadata.toString()
-        ); // add 100000000000 owner1,5000000 oner2 account
-        console.log("get_owner_blance", get_owner_blance);
-        const get_user1_blance_after = await getFaBalance(
-          user1,
-          metadata.toString()
-        ); // add oner1 add 1000000
-        console.log("get_user1_blance", get_user1_blance);
-        const get_user2_blance_after = await getFaBalance(
-          user2,
-          metadata.toString()
-        ); // add owner3 add 50000000
-        console.log("get_user2_blance", get_user2_blance);
-        // expect(get_owner_blance_after).toBe()
-      } catch (error) {
-        console.log("error", error);
-      }
-    });
+        console.log("Bulk Mint Transaction:", bulkMintTx);
 
-    it("burn coin", async () => {
+        // Retrieve balances after minting
+        const user1BalanceAfter = await getFaBalance(user1, metadata.toString());
+        const user2BalanceAfter = await getFaBalance(user2, metadata.toString());
+
+        // Assertions
+        expect(user1BalanceAfter).toEqual(initialUser1Balance + amount_to_mint); // User1's balance should increase by amount_to_mint
+        expect(user2BalanceAfter).toEqual(initialUser2Balance + amount_to_mint / 2); // User2's balance should increase by half of amount_to_mint
+
+      } catch (error) {
+        console.log("Error occurred during bulk minting:", error);
+      }
+    }, 10000);
+
+    it("Burn Coin", async () => {
       try {
-        // Assuming Alice wants to burn some coins from her account
-        console.log("start burning coins...");
-        // Get the initial balance of the owner
+        // Starting the process of burning coins
+        console.log("Start burning coins...");
+
+        // Get the initial balance of the user
         const metadata = await getMetadata(owner);
-        const initialBalanceOwner = await getFaBalance(
-          user1,
-          metadata.toString()
-        );
-        console.log("initialBalanceOwner206", initialBalanceOwner);
-        // Define the amount of coins to burn
-        const amountToBurn = 1000000; // Adjust as necessary
-        // // Burn coins from the owner's account
+        const initialBalanceUser = await getFaBalance(user1, metadata.toString());
+
+        // Burn coins from the user's account
         const burnCoinTransactionHash = await burnCoin(
           owner,
           user1.accountAddress,
-          amountToBurn
+          amount_To_Burn
         );
-        console.log("Burn coin transaction hash:", burnCoinTransactionHash);
-        // Get the final balance of the owner after burning coins
-        const finalBalanceOwner = await getFaBalance(
-          user1,
-          metadata.toString()
-        );
-        console.log("finalBalanceOwner", finalBalanceOwner);
+
+        // Get the final balance of the user after burning coins
+        const finalBalanceUser = await getFaBalance(user1, metadata.toString());
+
         // Assert that the final balance is decreased by the amount burned
-        expect(finalBalanceOwner).toBe(initialBalanceOwner - amountToBurn);
-        // console.log("Initial balance of owner:", initialBalanceOwner);
-        // console.log("Final balance of owner:", finalBalanceOwner);
+        expect(finalBalanceUser).toBe(initialBalanceUser - amount_To_Burn);
       } catch (error) {
-        console.log("error", error);
+        // Catch any errors that occur during the process
+        console.log("Error occurred during burning coins:", error);
       }
     });
   });
@@ -337,13 +326,15 @@ describe("Kcash Test", () => {
     it("Transfer Coins", async () => {
       try {
         console.log("Starting testing transfer coin");
+
         // Retrieve metadata address
         const metadataAddress = await getMetadata(owner);
+
+        // Retrieve initial balances of users
         const initialBalanceuser1 = await getFaBalance(
           user1,
           metadataAddress.toString()
         );
-
         const initialBalanceuser2 = await getFaBalance(
           user2,
           metadataAddress.toString()
@@ -358,13 +349,12 @@ describe("Kcash Test", () => {
         );
         console.log("Transaction hash:", transactionHash);
 
-        // Retrieve final balances
+        // Retrieve final balances after the transfer
         const finalBalanceuser1 = await getFaBalance(
           user1,
           metadataAddress.toString()
         );
-
-        const finalBalanceuser = await getFaBalance(
+        const finalBalanceuser2 = await getFaBalance(
           user2,
           metadataAddress.toString()
         );
@@ -373,17 +363,18 @@ describe("Kcash Test", () => {
         expect(transactionHash).toBeDefined();
         expect(typeof transactionHash).toBe("string");
 
-        // // Check if the balances changed correctly after the transfer
+        // Check if the balances changed correctly after the transfer
         expect(finalBalanceuser1).toBe(
           initialBalanceuser1 - amount_to_be_transfer
         );
-        expect(finalBalanceuser).toBe(
+        expect(finalBalanceuser2).toBe(
           initialBalanceuser2 + amount_to_be_transfer
         );
       } catch (error) {
+        // Catch any errors that occur during the process
         console.log("Error while transferring coins:", error);
       }
-    });
+    }, 10000);
 
     it("bulk transfer coin", async () => {
       try {
@@ -392,29 +383,27 @@ describe("Kcash Test", () => {
         // Retrieve metadata address
         const metadataAddress = await getMetadata(owner);
 
-        // Retrieve initial balances for user1 and user2
+        // Retrieve initial balances for owner, user1, and user2
         const initialBalanceOwner = await getFaBalance(
           owner,
           metadataAddress.toString()
         );
-        console.log("initialBalanceOwner", initialBalanceOwner);
 
         const initialBalanceUser1 = await getFaBalance(
           user1,
           metadataAddress.toString()
         );
-        console.log("initialBalanceUser1", initialBalanceUser1);
+
         const initialBalanceUser2 = await getFaBalance(
           user2,
           metadataAddress.toString()
         );
-        console.log("initialBalanceUser2", initialBalanceUser2);
 
         // Define the amount to be transferred in bulk
         const user_arr = [owner.accountAddress, user2.accountAddress];
-        let amount_to_mint_owner = 100 * decimal_kcash;
-        let amount_to_mint_user = amount_to_mint_owner / 2;
-        let amount_ar1 = [amount_to_mint_owner, amount_to_mint_user];
+        let amount_to_transfer_user1 = 100 * decimal_kcash;
+        let amount_to_transfer_user2 = amount_to_transfer_user1 / 2;
+        let amount_ar1 = [amount_to_transfer_user1, amount_to_transfer_user2];
 
         // Perform the bulk transfer from user1 to user2 and user3
         const transactionHash = await transferCoinBulk(
@@ -423,9 +412,8 @@ describe("Kcash Test", () => {
           user_arr, // Array of receiver addresses
           amount_ar1 // Amount to transfer to each receiver
         );
-        console.log("Transaction hash:", transactionHash);
 
-        // Retrieve final balances for user1, user2, and user3
+        // Retrieve final balances for owner, user1, and user2
         const finalBalanceOwner = await getFaBalance(
           owner,
           metadataAddress.toString()
@@ -439,7 +427,7 @@ describe("Kcash Test", () => {
           metadataAddress.toString()
         );
 
-        const amount = amount_to_mint_owner + amount_to_mint_user;
+        const amount = amount_to_transfer_user1 + amount_to_transfer_user2;
 
         // Assertions
         expect(transactionHash).toBeDefined();
@@ -448,15 +436,16 @@ describe("Kcash Test", () => {
         // Check if the balances changed correctly after the bulk transfer
         expect(finalBalanceUser1).toBe(initialBalanceUser1 - amount); // 2 receivers, so deduct 2 * amountBulk from user1
         expect(finalBalanceOwner).toBe(
-          initialBalanceOwner + amount_to_mint_owner
-        ); // User3's balance should also increase by amountBulk
+          initialBalanceOwner + amount_to_transfer_user1
+        ); // Owner's balance should decrease by amountBulk
         expect(finalBalanceUser2).toBe(
-          initialBalanceUser2 + amount_to_mint_user
+          initialBalanceUser2 + amount_to_transfer_user2
         ); // User2's balance should increase by amountBulk
       } catch (error) {
+        // Catch any errors that occur during the process
         console.log("Error while performing bulk transfer coin:", error);
       }
-    });
+    }, 10000);
   });
 
   describe("admin- transfer", () => {
@@ -543,17 +532,23 @@ describe("Kcash Test", () => {
       try {
         // Test freezing an account
         console.log("Testing freeze...");
+
+        // Retrieve metadata address
         const metadata = await getMetadata(owner);
-        const is_freezbefor = await getIs_freez(user1, metadata.toString());
-        console.log("is_freezbefor", is_freezbefor);
 
+        // Retrieve the freeze status of the account before freezing
+        const is_freeze_before = await getIs_freez(user1, metadata.toString());
+
+        // Freeze the specified account
         const freezeTransactionHash = await freeze(owner, user1.accountAddress);
-        const is_freezafter = await getIs_freez(user1, metadata.toString());
-        console.log("is_freez", is_freezafter);
 
-        expect(is_freezafter).toBe(true);
-        expect(freezeTransactionHash).toBeDefined();
-        expect(typeof freezeTransactionHash).toBe("string");
+        // Retrieve the freeze status of the account after freezing
+        const is_freeze_after = await getIs_freez(user1, metadata.toString());
+
+        // Assertions
+        expect(is_freeze_after).toBe(true); // Check if the account is frozen after the transaction
+        expect(freezeTransactionHash).toBeDefined(); // Check if the transaction hash is defined
+        expect(typeof freezeTransactionHash).toBe("string"); // Check if the transaction hash is a string
       } catch (error) {
         console.log("Error while freezing account:", error);
       }
@@ -563,27 +558,34 @@ describe("Kcash Test", () => {
       try {
         // Test unfreezing an account
         console.log("Testing unfreeze...");
+
+        // Retrieve metadata address
         const metadata = await getMetadata(owner);
-        const is_freezbefor = await getIs_freez(user1, metadata.toString());
-        console.log("is_freezbefor", is_freezbefor);
+
+        // Retrieve the freeze status of the account before unfreezing
+        const is_freeze_before = await getIs_freez(user1, metadata.toString());
+
+        // Unfreeze the specified account
         const unfreezeTransactionHash = await unfreeze(
           owner,
           user1.accountAddress
         );
         console.log("Unfreeze transaction hash:", unfreezeTransactionHash);
-        const is_freezafter = await getIs_freez(user1, metadata.toString());
-        console.log("is_freezbefor", is_freezafter);
 
-        expect(is_freezafter).toBe(false);
-        expect(unfreezeTransactionHash).toBeDefined();
-        expect(typeof unfreezeTransactionHash).toBe("string");
-        // You can add more assertions here if needed
+        // Retrieve the freeze status of the account after unfreezing
+        const is_freeze_after = await getIs_freez(user1, metadata.toString());
+
+        // Assertions
+        expect(is_freeze_after).toBe(false); // Check if the account is unfrozen after the transaction
+        expect(unfreezeTransactionHash).toBeDefined(); // Check if the transaction hash is defined
+        expect(typeof unfreezeTransactionHash).toBe("string"); // Check if the transaction hash is a string
       } catch (error) {
         console.log("Error while unfreezing account:", error);
       }
     });
   });
 
+  
   describe("bucket-transfer three to one", () => {
     it("admin Transfer  kcash From his Reward3 to user Reward1 bulk ", async () => {
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
@@ -612,12 +614,13 @@ describe("Kcash Test", () => {
       const ownerExpected = ownerC - 30 * decimal_kcash;
 
       // Assert the changes in bucket stores
-      expect(ownerC - 30 * decimal_kcash).toEqual(ownerC1); // Owner's bucket 3 should decrease by transferKcash
-      expect(user1A + 10 * decimal_kcash).toEqual(user1A2); // User1's bucket 1 should increase by transferKcash
-      expect(user2A + 20 * decimal_kcash).toEqual(user2A3); // User2's bucket 1 should increase by transferKcash
+      expect(ownerC1 ).toEqual(ownerC- 30 * decimal_kcash); // Owner's bucket 3 should decrease by transferKcash
+      expect(user1A2).toEqual(user1A + 10 * decimal_kcash); // User1's bucket 1 should increase by transferKcash
+      expect(user2A3 ).toEqual(user2A+ 20 * decimal_kcash); // User2's bucket 1 should increase by transferKcash
 
       expect(rew2Tx).toBeDefined();
-    }, 10000);
+    }, 20000);
+
 
     it("admin Transfer  kcash From his Reward3 to user Reward1 ", async () => {
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
@@ -638,44 +641,43 @@ describe("Kcash Test", () => {
       let [user1A1, user1B2, user1C3] = await getBucketStore(user1);
 
       // Assert the changes in bucket stores
-      expect(ownerC - 10 * decimal_kcash).toEqual(ownerC1); // Owner's bucket 3 should decrease by transferKcash
-      expect(user1A + 10 * decimal_kcash).toEqual(user1A1); // User1's bucket 1 should increase by transferKcash
-
+      expect(ownerC1).toEqual(ownerC-10 * decimal_kcash); // Owner's bucket 3 should decrease by transferKcash
+      expect(user1A1 ).toEqual(user1A + 10 * decimal_kcash); // User1's bucket 1 should increase by transferKcash
       expect(rew2Tx).toBeDefined();
-    }, 10000);
+    }, 20000);
 
-    it("admin Transfer kcash From his Reward3 to user Reward1 bulk", async () => {
-      let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
-      let [user1A, user1B, user1C] = await getBucketStore(user1);
-      let [user2A, user2B, user2C] = await getBucketStore(user2);
+    // it("admin Transfer kcash From his Reward3 to user Reward1 bulk", async () => {
+    //   let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
+    //   let [user1A, user1B, user1C] = await getBucketStore(user1);
+    //   let [user2A, user2B, user2C] = await getBucketStore(user2);
 
-      const transferKcash1 = 10 * decimal_kcash;
-      const transferKcash2 = 20 * decimal_kcash;
-      const amountbulk_arr = [transferKcash1, transferKcash2];
+    //   const transferKcash1 = 10 * decimal_kcash;
+    //   const transferKcash2 = 20 * decimal_kcash;
+    //   const amountbulk_arr = [transferKcash1, transferKcash2];
 
-      // Transfer rewards from bucket 3 to bucket 1
-      let rew2Tx = await transferReward3ToReward1ByAdminOnlyInBulk(
-        owner,
-        receiver_ar,
-        amountbulk_arr
-      );
-      console.log("🚀 ~ rewTx:", rew2Tx);
+    //   // Transfer rewards from bucket 3 to bucket 1
+    //   let rew2Tx = await transferReward3ToReward1ByAdminOnlyInBulk(
+    //     owner,
+    //     receiver_ar,
+    //     amountbulk_arr
+    //   );
+    //   console.log("🚀 ~ rewTx:", rew2Tx);
 
-      // Validate bucket stores after transfer
-      let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
-      let [user1A2, user1B2, user1C3] = await getBucketStore(user1);
-      let [user2A3, user2B3, user2C3] = await getBucketStore(user2);
+    //   // Validate bucket stores after transfer
+    //   let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
+    //   let [user1A2, user1B2, user1C3] = await getBucketStore(user1);
+    //   let [user2A3, user2B3, user2C3] = await getBucketStore(user2);
 
-      // Assertions
-      const ownerExpected = ownerC - (transferKcash1 + transferKcash2);
+    //   // Assertions
+    //   const ownerExpected = ownerC - (transferKcash1 + transferKcash2);
 
-      // Assert the changes in bucket stores
-      expect(ownerC1).toEqual(ownerExpected); // Owner's bucket 3 should decrease by transferKcash1 + transferKcash2
-      expect(user1A2).toEqual(user1A + transferKcash1); // User1's bucket 1 should increase by transferKcash1
-      expect(user2A3).toEqual(user2A + transferKcash2); // User2's bucket 1 should increase by transferKcash2
+    //   // Assert the changes in bucket stores
+    //   expect(ownerC1).toEqual(ownerExpected); // Owner's bucket 3 should decrease by transferKcash1 + transferKcash2
+    //   expect(user1A2).toEqual(user1A + transferKcash1); // User1's bucket 1 should increase by transferKcash1
+    //   expect(user2A3).toEqual(user2A + transferKcash2); // User2's bucket 1 should increase by transferKcash2
 
-      expect(rew2Tx).toBeDefined();
-    }, 10000);
+    //   expect(rew2Tx).toBeDefined();
+    // }, 10000);
   });
 
   describe("bucket-transfer three to two", () => {
@@ -853,17 +855,17 @@ describe("Kcash Test", () => {
       // Create a message and calculate its hash
       const message = new Uint8Array(Buffer.from("KCash"));
       const messageHash = sha256(message);
-    
+
       // Sign the message hash using the owner's private key
       const signature = await signMessage(privateKeyOwner, messageHash);
       console.log("signature", signature);
-    
+
       // Retrieve initial bucket store balances
       console.log("owner", await getBucketStore(owner));
       console.log("user2", await getBucketStore(user2));
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
       let [user2A, user2B, user2C] = await getBucketStore(user2);
-    
+
       // Call adminTransferWithSignature function
       let adminSignatureTx = await adminTransferWithSignature(
         owner,
@@ -874,22 +876,22 @@ describe("Kcash Test", () => {
         message
       );
       console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
-    
+
       // Retrieve final bucket store balances
       let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
       let [user2A2, user2B2, user2C2] = await getBucketStore(user2);
       console.log("owner", await getBucketStore(owner));
       console.log("user2", await getBucketStore(user2));
-    
+
       // Assertions
       expect(ownerA1).toEqual(ownerA - 1); // Check if 1 is deducted from ownerA
       expect(ownerB1).toEqual(ownerB - 2); // Check if 2 is deducted from ownerB
       expect(ownerC1).toEqual(ownerC - 3); // Check if 3 is deducted from ownerC
-    
+
       expect(user2A2).toEqual(user2A + 3); // Check if 3 is added to user2A
       expect(user2B2).toEqual(user2B + 1); // Check if 1 is added to user2B
       expect(user2C2).toEqual(user2C + 2); // Check if 2 is added to user2C
     }, 10000);
-    
+
   });
 });

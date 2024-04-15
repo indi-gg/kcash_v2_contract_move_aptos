@@ -16,6 +16,7 @@ module FACoin::fa_coin {
     use std::vector;
     use aptos_std::ed25519;
     use aptos_std::hash;
+    use std::bcs;
 
 
     /// Only fungible asset metadata owner can make changes.
@@ -28,11 +29,13 @@ module FACoin::fa_coin {
     const EINVALID_SIGNATURE: u64 = 7;
     const ESIGNATURE_ALREADY_USED: u64 = 8;
 
-    const PUBLIC_KEY: vector<u8> = x"b99db25910f2bd34b2ad0e2d09520b0dda7f67735d588a37b135761dc9968fb0";
+    const PUBLIC_KEY: vector<u8> = x"625e1eca68c2b85f0f1899486e0fe2b0dffadad59e4d2ab534f01660fe9ebd24";
     const ASSET_SYMBOL: vector<u8> = b"FA";
     const BUCKET_CORE_SEED: vector<u8> = b"BA";
         const BUCKET_COLLECTION_DESCRIPTION: vector<u8> = b"Bucket collections";
     const BUCKET_COLLECTION_NAME: vector<u8> = b"Bucket store";
+
+
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
@@ -94,6 +97,15 @@ module FACoin::fa_coin {
         signatureEd: ed25519::Signature,
         result: bool,
         messageHash: vector<u8>
+
+    }
+
+    #[event]
+    struct MessageHash has drop, store{
+        message: AdminTransferSignature,
+        messag_bytes: vector<u8>,
+        message_hash: vector<u8>,
+        is_signature_valid: bool
 
     }
 
@@ -162,12 +174,9 @@ module FACoin::fa_coin {
 
 
     // Verify signature
-    fun signature_verification( admin: &signer, message: vector<u8>, signature: vector<u8>, nonce: u64): bool acquires ManagedNonce{
-        let e_nonce = get_nonce(signer::address_of(admin));
-        assert!(nonce == e_nonce, error::permission_denied(ESIGNATURE_ALREADY_USED));
-
+    fun signature_verification(messageHash: vector<u8>, signature: vector<u8>): bool{
         // Generating Message Hash using sha2_256
-        let messageHash = hash::sha2_256(message);
+        //let messageHash = hash::sha2_256(message);
 
         // Converting Public Key Bytes into UnValidated Public Key
         let unValidatedPublickkey = ed25519:: new_unvalidated_public_key_from_bytes(PUBLIC_KEY);
@@ -178,26 +187,90 @@ module FACoin::fa_coin {
         // Verifying Signature using Message Hash and public key
         let result = ed25519::signature_verify_strict(&signatureEd, &unValidatedPublickkey, messageHash);
 
-        // event::emit<SignVerify>(SignVerify{message:messageHash, signatureEd, result, messageHash});
+        event::emit<SignVerify>(SignVerify{message:messageHash, signatureEd, result, messageHash});
 
         return result
     }
 
-    // Admin Transfers with Signature
-    public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductionFromSender: vector<u64>, additionToRecipient: vector<u64>, signature: vector<u8>, message: vector<u8>, nonce: u64 ) 
-    acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce {
-        // Verify designated signer with signature
-        let is_signature_valid = signature_verification( admin, message, signature, nonce);
-        assert!(is_signature_valid, error::permission_denied(EINVALID_SIGNATURE));
-        
-        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
-        assert!(vector::length(&deductionFromSender) == vector::length(&additionToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
-        let (r1, r2, r3) = (*vector::borrow(&deductionFromSender, 0), *vector::borrow(&deductionFromSender, 1), *vector::borrow(&deductionFromSender, 2));
-        withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
-        deposit_to_bucket(to, *vector::borrow(&additionToRecipient, 0), *vector::borrow(&additionToRecipient, 1), *vector::borrow(&additionToRecipient, 2));
-        transfer_internal(admin, signer::address_of(admin), to, r1+r2+r3);
-        update_nonce(signer::address_of(admin));
+
+    struct AdminTransferSignature has drop, store {
+        from: address,
+        to: address,
+        deductionFromSender: vector<u64>,
+        additionToRecipient: vector<u64>
     }
+
+   
+
+    // Admin Transfers with Signature
+    public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductnFromSender: vector<u64>, additnToRecipient: vector<u64>, signature: vector<u8>) acquires ManagedFungibleAsset, BucketStore, BucketCore {
+
+        let message = AdminTransferSignature{
+            from: signer::address_of(admin),
+            to: to,
+            deductionFromSender: deductnFromSender,
+            additionToRecipient: additnToRecipient
+        };
+        
+        let messag_bytes = bcs::to_bytes<AdminTransferSignature>(&message);
+        let message_hash = hash::sha2_256(messag_bytes);
+
+        // Verify designated signer with signature
+        let is_signature_valid = signature_verification(message_hash, signature);
+
+        event::emit<MessageHash>(MessageHash{message, messag_bytes, message_hash, is_signature_valid});
+
+        if(is_signature_valid == true) {
+            assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+            assert!(vector::length(&deductnFromSender) == vector::length(&additnToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+            let (r1, r2, r3) = (*vector::borrow(&deductnFromSender, 0), *vector::borrow(&deductnFromSender, 1), *vector::borrow(&deductnFromSender, 2));
+            withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
+            deposit_to_bucket(to, *vector::borrow(&additnToRecipient, 0), *vector::borrow(&additnToRecipient, 1), *vector::borrow(&additnToRecipient, 2));
+            transfer_internal(admin, signer::address_of(admin), to, r1+r2+r3);
+        }
+    }
+
+    struct AdminTransferSignatureBulk has drop, store {
+        from: address,
+        to: vector<address>,
+        deductionFromSender: vector<vector<u64>>,
+        additionToRecipient: vector<vector<u64>>
+    }
+
+    // Admin Transfers with Signature Bulk
+      public entry fun admin_transfer_with_signature_bulk(admin: &signer, to_vec: vector<address>, deductionFromSender_vec: vector<vector<u64>>, additionToRecipient_vec: vector<vector<u64>>, signature: vector<u8>)
+        acquires ManagedFungibleAsset, BucketStore, BucketCore{
+
+        let message = AdminTransferSignatureBulk{
+            from: signer::address_of(admin),
+            to: to_vec,
+            deductionFromSender: deductionFromSender_vec,
+            additionToRecipient: additionToRecipient_vec
+        };
+        
+        let messag_bytes = bcs::to_bytes<AdminTransferSignatureBulk>(&message);
+        let message_hash = hash::sha2_256(messag_bytes);
+
+        // Verify designated signer with signature
+        let is_signature_valid = signature_verification(message_hash, signature);
+
+
+
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let len = vector::length(&deductionFromSender_vec);
+        assert!(len == vector::length(&additionToRecipient_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let i = 0;
+        loop {
+            let to = vector::borrow(&to_vec, i);
+            let deductionFromSender = vector::borrow(&deductionFromSender_vec, i);
+            let additionToRecipient = vector::borrow(&additionToRecipient_vec, i);
+            admin_transfer(admin, *to, *deductionFromSender, *additionToRecipient);
+            i = i + 1;
+            if (i >= len) break;
+        }
+    }
+
+ 
 
     
 
@@ -286,12 +359,6 @@ module FACoin::fa_coin {
             create_bucket_store(user);
         }
     }
-
-    // #[view]
-    // public fun get_public_key(str: &string::String): vector<u8> {
-    // //    PUBLIC_KEY
-    //     &str.bytes
-    // }
 
     #[view]
     public fun has_bucket_store(owner_addr: address): (bool) {
@@ -850,7 +917,7 @@ module FACoin::fa_coin {
         assert!(primary_fungible_store::balance(creator_address, asset) == 100, 4);
         freeze_account(creator, creator_address);
         assert!(primary_fungible_store::is_frozen(creator_address, asset), 5);
-        transfer(creator, creator_address, aaron_address, 10);
+        // transfer(creator, creator_address, aaron_address, 10);
         assert!(primary_fungible_store::balance(aaron_address, asset) == 10, 6);
 
         unfreeze_account(creator, creator_address);

@@ -20,7 +20,7 @@ const DEFAULT_CONFIG: Options = {
   splitting: true,
   target: "es2020",
   env: {
-    APTOS_NETWORK: process.env.APTOS_NETWORK ?? "Devnet",
+    APTOS_NETWORK: process.env.APTOS_NETWORK ?? "Testnet",
     ANS_TEST_ACCOUNT_PRIVATE_KEY:
       process.env.ANS_TEST_ACCOUNT_PRIVATE_KEY ?? "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221",
     ANS_TEST_ACCOUNT_ADDRESS:

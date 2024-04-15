@@ -141,7 +141,7 @@ export async function adminTransferWithSignature(
   });
   await aptos.waitForTransaction({transactionHash: pendingTxn.hash})
 
-  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
+  // await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
 
   return pendingTxn.hash;
 }
@@ -1027,37 +1027,30 @@ async function main() {
   // console.log("\nOwner mints 1000 kcash in his own account");
 
   // let owner_mint = 1000 * decimal_kcash;
-  let user_mint = 100 * decimal_kcash;
-  // let mTx = await mintCoin(
-  //   owner,
-  //   user2,
-  //   owner_mint,
-  //   owner_mint * 0.1,
-  //   owner_mint * 0.2,
-  //   owner_mint * 0.7
-  // );
-  // await aptos.waitForTransaction({ transactionHash: mTx });
-  // console.log("🚀 ~ mTx:", mTx);
+  let user_mint = 10000 * decimal_kcash;
+ 
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+ 
+// let mTxU = await mintCoin(
+//     owner,
+//     user2,
+//     user_mint,
+//     user_mint * 0.3,
+//     user_mint * 0.4,
+//     user_mint * 0.3
+//   );
+//   await aptos.waitForTransaction({ transactionHash: mTxU });
+//   console.log("🚀 ~ mTx:", mTxU);
 
-  let mTxU = await mintCoin(
-    owner,
-    user1,
-    user_mint,
-    user_mint * 0.1,
-    user_mint * 0.2,
-    user_mint * 0.7
-  );
-  await aptos.waitForTransaction({ transactionHash: mTxU });
-  console.log("🚀 ~ mTx:", mTxU);
-
-  // console.log(
-  //   `Owner's KCash balance after mint: ${await getFaBalance(
-  //     user1,
-  //     metadataAddress
-  //   )}.`
-  // );
-  // console.log("Owner bucket store :", await getBucketStore(owner));
-  // console.log("User1 bucket store :", await getBucketStore(user1));
+//   console.log(
+//     `Owner's KCash balance after mint: ${await getFaBalance(
+//       user1,
+//       metadataAddress
+//     )}.`
+//   );
+//   console.log("Owner bucket store :", await getBucketStore(owner));
+//   console.log("User1 bucket store :", await getBucketStore(user1));
+//   console.log("User1 bucket store :", await getBucketStore(user2));
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1178,13 +1171,13 @@ async function main() {
 
   // console.log("\n Mint in Bulk for user1 and user2****");
 
-  //   let amount_to_mint_user1 = 100 * decimal_kcash;
-  //   let amount_to_mint_user2 = amount_to_mint_user1 / 2;
-  //   let amount_ar = [amount_to_mint_user1, amount_to_mint_user2];
-  //   let receiver_ar = [user1.accountAddress, user2.accountAddress];
-  //   let r1_ar = [amount_to_mint_user1 * 0.5, amount_to_mint_user2 * 0.5];
-  //   let r2_ar = [amount_to_mint_user1 * 0.3, amount_to_mint_user2 * 0.3];
-  //   let r3_ar = [amount_to_mint_user1 * 0.2, amount_to_mint_user2 * 0.2];
+    // let amount_to_mint_user1 = 100 * decimal_kcash;
+    // let amount_to_mint_user2 = amount_to_mint_user1 / 2;
+    // let amount_ar = [amount_to_mint_user1, amount_to_mint_user2];
+    // let receiver_ar = [user1.accountAddress, user2.accountAddress];
+    // let r1_ar = [amount_to_mint_user1 * 0.5, amount_to_mint_user2 * 0.5];
+    // let r2_ar = [amount_to_mint_user1 * 0.3, amount_to_mint_user2 * 0.3];
+    // let r3_ar = [amount_to_mint_user1 * 0.2, amount_to_mint_user2 * 0.2];
 
   //   let bulkMintTx = await bulkMintCoin(
   //     owner,
@@ -1244,11 +1237,25 @@ async function main() {
 
   //   //////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+
   // console.log(
   //   "\nNow Owner will transfer in bulk from his bucket3 to bucket1 of users"
   // );
   // console.log("10 kcash will be ransferred in user1 account");
   // console.log("20 kcash will be ransferred in user2 account");
+  // console.log(
+  //   "Owner bucket store after transfer in bulk :",
+  //   await getBucketStore(owner)
+  // );
+  // console.log(
+  //   "user1 bucket store after transfer in bulk :",
+  //   await getBucketStore(user1)
+  // );
+  // console.log(
+  //   "user2 bucket store after transfer in bulk :",
+  //   await getBucketStore(user2)
+  // );
   // amount_ar = [10 * decimal_kcash, 20 * decimal_kcash];
 
   // let bTtx = await transferReward3ToReward1ByAdminOnlyInBulk(
@@ -1748,10 +1755,10 @@ async function main() {
   ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
   // Signing a Message
-  const signature = await signMessage(privateKeyOwner, messageHash);
-  console.log("=============================================");
-  console.log("Signature: ", signature.toString());
-  console.log("=============================================");
+  // const signature = await signMessage(privateKeyOwner, messageHash);
+  // console.log("=============================================");
+  // console.log("Signature: ", signature.toString());
+  // console.log("=============================================");
 
   // // Verifying Signature
   // const sigVerifyTransaction = signatureVerification(message, publicKeyOwner.toUint8Array(), signature, owner);
@@ -1761,8 +1768,8 @@ async function main() {
   // console.log("🚀 ~ publicKey:", publicKey);
   // console.log("PublicKey Off-Chain: ", publicKeyOwner.toUint8Array());
 
-  let nonce = await getNonce(owner);
-  console.log("🚀 ~ nonce:", nonce);
+  // let nonce = await getNonce(owner);
+  // console.log("🚀 ~ nonce:", nonce);
 
   // let tx = await transferReward3ToReward1WithSign(
   //   owner,
@@ -1774,59 +1781,64 @@ async function main() {
   //   nonce
   // );
   // console.log("🚀 ~ tx:", tx);
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+  
+// let tx1_bulk = await transferReward3ToReward1BulkWithSign(
+//     owner,
+//     user1,
+//     [user2.accountAddress, owner.accountAddress],
+//     [1, 2],
+//     signature,
+//     message,
+//   nonce
+//   );
+//   console.log("🚀 ~ tx1_bulk:", tx1_bulk);
 
-  // let tx1_bulk = await transferReward3ToReward1BulkWithSign(
+//   console.log("Owner initial bucket store :", await getBucketStore(owner));
+//   console.log("User1 initial bucket store :", await getBucketStore(user1));
+//   console.log("User2 initial bucket store :", await getBucketStore(user2));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // let tx2 = await transferReward3ToReward2WithSign(
+  //   owner,
+  //   user1,
+  //   user2.accountAddress,
+  //   10,
+  //   signature,
+  //   message,
+  //   nonce
+  // );
+  // console.log("🚀 ~ tx:", tx2);
+  // console.log("\nOwner  bucket after tx2 store :", await getBucketStore(owner));
+  // console.log("User1  bucket after tx2 store :", await getBucketStore(user1));
+  // console.log("User2  bucket after tx2 store :", await getBucketStore(user2));
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+  
+  // let tx2_bulk = await transferReward3ToReward2BulkWithSign(
   //   owner,
   //   user1,
   //   [user2.accountAddress, owner.accountAddress],
   //   [1, 2],
   //   signature,
   //   message,
-  // nonce
+  //   nonce
   // );
-  // console.log("🚀 ~ tx1_bulk:", tx1_bulk);
+  // console.log("🚀 ~ tx1_bulk:", tx2_bulk);
 
-  console.log("Owner initial bucket store :", await getBucketStore(owner));
-  console.log("User1 initial bucket store :", await getBucketStore(user1));
-  console.log("User2 initial bucket store :", await getBucketStore(user2));
-
-  let tx2 = await transferReward3ToReward2WithSign(
-    owner,
-    user1,
-    user2.accountAddress,
-    10,
-    signature,
-    message,
-    nonce
-  );
-  console.log("🚀 ~ tx:", tx2);
-  console.log("\nOwner  bucket after tx2 store :", await getBucketStore(owner));
-  console.log("User1  bucket after tx2 store :", await getBucketStore(user1));
-  console.log("User2  bucket after tx2 store :", await getBucketStore(user2));
-
-  let tx2_bulk = await transferReward3ToReward2BulkWithSign(
-    owner,
-    user1,
-    [user2.accountAddress, owner.accountAddress],
-    [1, 2],
-    signature,
-    message,
-    nonce
-  );
-  console.log("🚀 ~ tx1_bulk:", tx2_bulk);
-
-  console.log(
-    "\nOwner  bucket after txbulk2 store :",
-    await getBucketStore(owner)
-  );
-  console.log(
-    "User1  bucket after txbulk2 store :",
-    await getBucketStore(user1)
-  );
-  console.log(
-    "User2  bucket after txbulk2 store :",
-    await getBucketStore(user2)
-  );
+  // console.log(
+  //   "\nOwner  bucket after txbulk2 store :",
+  //   await getBucketStore(owner)
+  // );
+  // console.log(
+  //   "User1  bucket after txbulk2 store :",
+  //   await getBucketStore(user1)
+  // );
+  // console.log(
+  //   "User2  bucket after txbulk2 store :",
+  //   await getBucketStore(user2)
+  // );
 
   console.log("done.");
 }

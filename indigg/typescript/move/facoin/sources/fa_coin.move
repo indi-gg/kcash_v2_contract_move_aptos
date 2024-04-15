@@ -27,7 +27,7 @@ module FACoin::fa_coin {
     const EUSER_ALREADY_HAS_BUCKET_STORE: u64 = 5;
     const EINVALID_ARGUMENTS_LENGTH: u64 = 6;
 
-    const PUBLIC_KEY: vector<u8> = x"4015be72e8aac76401ea951ad7c97009f971e63b6f679495cc023b79c2c91f64";
+    const PUBLIC_KEY: vector<u8> = x"625e1eca68c2b85f0f1899486e0fe2b0dffadad59e4d2ab534f01660fe9ebd24";
     const ASSET_SYMBOL: vector<u8> = b"FA";
     const BUCKET_CORE_SEED: vector<u8> = b"BA";
     const BUCKET_COLLECTION_DESCRIPTION: vector<u8> = b"Bucket collections";
@@ -170,12 +170,12 @@ module FACoin::fa_coin {
         // Verifying Signature using Message Hash and public key
         let result = ed25519::signature_verify_strict(&signatureEd, &unValidatedPublickkey, messageHash);
 
-        // event::emit<SignVerify>(SignVerify{message:messageHash, signatureEd, result, messageHash});
+        event::emit<SignVerify>(SignVerify{message:messageHash, signatureEd, result, messageHash});
 
         return result
     }
 
-        
+
     struct AdminTransferSignature has drop, store {
         from: address,
         to: address,
@@ -198,8 +198,6 @@ module FACoin::fa_coin {
         let messag_bytes = bcs::to_bytes<AdminTransferSignature>(&message);
         let message_hash = hash::sha2_256(messag_bytes);
 
-
-
         // Verify designated signer with signature
         let is_signature_valid = signature_verification(message_hash, signature);
 
@@ -213,7 +211,46 @@ module FACoin::fa_coin {
             deposit_to_bucket(to, *vector::borrow(&additnToRecipient, 0), *vector::borrow(&additnToRecipient, 1), *vector::borrow(&additnToRecipient, 2));
             transfer_internal(admin, signer::address_of(admin), to, r1+r2+r3);
         }
+    }
 
+    struct AdminTransferSignatureBulk has drop, store {
+        from: address,
+        to: vector<address>,
+        deductionFromSender: vector<vector<u64>>,
+        additionToRecipient: vector<vector<u64>>
+    }
+
+    // Admin Transfers with Signature Bulk
+      public entry fun admin_transfer_with_signature_bulk(admin: &signer, to_vec: vector<address>, deductionFromSender_vec: vector<vector<u64>>, additionToRecipient_vec: vector<vector<u64>>, signature: vector<u8>)
+        acquires ManagedFungibleAsset, BucketStore, BucketCore{
+
+        let message = AdminTransferSignatureBulk{
+            from: signer::address_of(admin),
+            to: to_vec,
+            deductionFromSender: deductionFromSender_vec,
+            additionToRecipient: additionToRecipient_vec
+        };
+        
+        let messag_bytes = bcs::to_bytes<AdminTransferSignatureBulk>(&message);
+        let message_hash = hash::sha2_256(messag_bytes);
+
+        // Verify designated signer with signature
+        let is_signature_valid = signature_verification(message_hash, signature);
+
+
+
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let len = vector::length(&deductionFromSender_vec);
+        assert!(len == vector::length(&additionToRecipient_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let i = 0;
+        loop {
+            let to = vector::borrow(&to_vec, i);
+            let deductionFromSender = vector::borrow(&deductionFromSender_vec, i);
+            let additionToRecipient = vector::borrow(&additionToRecipient_vec, i);
+            admin_transfer(admin, *to, *deductionFromSender, *additionToRecipient);
+            i = i + 1;
+            if (i >= len) break;
+        }
     }
 
  

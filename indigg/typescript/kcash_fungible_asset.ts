@@ -75,12 +75,12 @@ class MessageMoveStruct extends Serializable {
     serializer.serialize(this.from); // Composable serialization of another Serializable object
     serializer.serialize(this.to);
 
-    // Serialize each Uint64 value in deductionFromSender array
+    serializer.serializeU32AsUleb128(deductionFromSender.length);
     for (const uint64 of this.deductionFromSender) {
       serializer.serialize(uint64);
     }
 
-    // Serialize each Uint64 value in additionToRecipient array
+    serializer.serializeU32AsUleb128(additionToRecipient.length);
     for (const uint64 of this.additionToRecipient) {
       serializer.serialize(uint64);
     }
@@ -230,6 +230,33 @@ export async function adminTransferWithSignature(
     transaction,
     senderAuthenticator,
   });
+
+  return pendingTxn.hash;
+}
+
+// Admin can transfer to any account's multiple user's reward field
+export async function adminTransferWithSignatureBulk(
+  admin: Account,
+  to: AccountAddress[],
+  deductionFromSender: AnyNumber[][],
+  additionToRecipient: AnyNumber[][]
+) {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${admin.accountAddress}::fa_coin::admin_transfer_with_signature_bulk`,
+      functionArguments: [to, deductionFromSender, additionToRecipient],
+    },
+  });
+  const senderAuthenticator = await aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
+  });
+  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
 
   return pendingTxn.hash;
 }
@@ -894,7 +921,10 @@ async function main() {
 
   // Construct a MoveStruct
   const moveStructBytes = moveStruct.bcsToBytes();
-  console.log("🚀 ~ moveStructBytes:", moveStructBytes);
+  const msgMoveByteBuffer = Buffer.from(moveStructBytes.toString());
+  const msgMoveStructBytehexString = "0x" + msgMoveByteBuffer.toString("hex");
+
+  console.log("🚀 ~ moveStructBytes:", msgMoveStructBytehexString);
 
   // Generating message hash
   // const messageMoveStructHash = "0xeaa9b8a41ee0fe9748bc20f9e3b1e09a245ac024a30d08b0d2cffddfe13035d4";
@@ -902,7 +932,7 @@ async function main() {
 
   const messageMoveStructHash = sha256(moveStructBytes);
   console.log("🚀 ~ messageMoveStructHash:", messageMoveStructHash.toString());
- 
+
   // Convert the hash array to a Buffer
   const msgMoveBuffer = Buffer.from(messageMoveStructHash.toString());
 
@@ -925,6 +955,19 @@ async function main() {
     signature
   );
   console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
+
+  let adminSignatureTxBulk = await adminTransferWithSignatureBulk(
+    owner,
+    [user2.accountAddress, user1.accountAddress],
+    [
+      [1, 2, 3],
+      [4, 5, 3],
+    ],
+    [
+      [3, 1, 2],
+      [6, 0, 6],
+    ]
+  );
 
   console.log("done.");
 }

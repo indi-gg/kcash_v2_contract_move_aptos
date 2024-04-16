@@ -229,7 +229,7 @@ module FACoin::fa_coin {
     /* *** Viewable functions *** */
     #[view]
     public fun get_nonce(admin: address) : u64 acquires ManagedNonce{
-        borrow_global_mut<ManagedNonce>(admin).nonce
+        if (exists<ManagedNonce>(admin)) borrow_global_mut<ManagedNonce>(admin).nonce else 0
     }
 
     #[view]
@@ -887,7 +887,10 @@ module FACoin::fa_coin {
     */
     public entry fun transfer_reward3_to_reward1(admin: &signer, from: &signer, to: address, amount: u64, signature: vector<u8>) 
     acquires ManagedFungibleAsset, BucketCore, BucketStore, ManagedNonce{
-        let nonce = get_nonce(signer::address_of(admin));
+        let nonce = get_nonce(signer::address_of(from));
+        if (nonce == 0 ){
+            move_to(from, ManagedNonce{ nonce })
+        };
         let message = UserTransferWithSign{
             from: signer::address_of(from),
             to,
@@ -903,7 +906,7 @@ module FACoin::fa_coin {
 
         assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
         user_transfer_internal(from, to, amount, 0);
-        update_nonce(signer::address_of(admin));
+        update_nonce(signer::address_of(from));
     }
 
     /**
@@ -919,7 +922,10 @@ module FACoin::fa_coin {
         let len = vector::length(&to_vec);
         assert!(len == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
 
-        let nonce = get_nonce(signer::address_of(admin));
+        let nonce = get_nonce(signer::address_of(from));
+        if (nonce == 0 ){
+            move_to(from, ManagedNonce{ nonce })
+        };
         // creating a struct for bulk transfer
         let message = UserTransferWithSignBulk{
             from: signer::address_of(from),
@@ -943,7 +949,7 @@ module FACoin::fa_coin {
             i = i + 1;
             if (i >= len) break;
         };
-        update_nonce(signer::address_of(admin));
+        update_nonce(signer::address_of(from));
     }
 
     /* *** Methods that requires signature *** */
@@ -953,7 +959,10 @@ module FACoin::fa_coin {
     */
     public entry fun transfer_reward3_to_reward2(admin: &signer, from: &signer, to: address, amount: u64, signature: vector<u8>) 
     acquires ManagedFungibleAsset, BucketCore, BucketStore, ManagedNonce{
-        let nonce = get_nonce(signer::address_of(admin));
+        let nonce = get_nonce(signer::address_of(from));
+        if (nonce == 0 ){
+            move_to(from, ManagedNonce{ nonce })
+        };
         let message = UserTransferWithSign{
             from: signer::address_of(from),
             to,
@@ -968,7 +977,7 @@ module FACoin::fa_coin {
 
         assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
         user_transfer_internal(from, to, amount, 1);
-        update_nonce(signer::address_of(admin));
+        update_nonce(signer::address_of(from));
     }
 
     /**
@@ -984,7 +993,10 @@ module FACoin::fa_coin {
         let len = vector::length(&to_vec);
         assert!(len == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
 
-        let nonce = get_nonce(signer::address_of(admin));
+        let nonce = get_nonce(signer::address_of(from));
+        if (nonce == 0 ){
+            move_to(from, ManagedNonce{ nonce })
+        };
         // creating a struct for bulk transfer
         let message = UserTransferWithSignBulk{
             from: signer::address_of(from),
@@ -1008,7 +1020,7 @@ module FACoin::fa_coin {
             i = i + 1;
             if (i >= len) break;
         };
-        update_nonce(signer::address_of(admin));
+        update_nonce(signer::address_of(from));
     }
 
     /// Burn fungible assets as the owner of metadata object.

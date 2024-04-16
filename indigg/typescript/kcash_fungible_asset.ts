@@ -50,7 +50,7 @@ const address_name = "FACoin"; // Address name from move.toml
 const decimal_kcash = 1;
 console.log("🚀 ~ decimal_kcash:", decimal_kcash);
 
-class Uint64 extends Serializable {
+export class Uint64 extends Serializable {
   constructor(public value: bigint) {
     super();
   }
@@ -61,7 +61,7 @@ class Uint64 extends Serializable {
 }
 
 // Define the MoveStruct class that implements the Serializable interface
-class MessageMoveStruct extends Serializable {
+ export class MessageMoveStruct extends Serializable {
   constructor(
     public from: AccountAddress, // where AccountAddress extends Serializable
     public to: AccountAddress, // where AccountAddress extends Serializable
@@ -168,13 +168,13 @@ export async function createStructForMsg(
   return userStructForSign;
 }
 
-const deductionFromSender = [
+ export const deductionFromSender = [
   new Uint64(BigInt(10)),
   new Uint64(BigInt(20)),
   new Uint64(BigInt(30)),
 ];
 
-const additionToRecipient = [
+ export const additionToRecipient = [
   new Uint64(BigInt(5)),
   new Uint64(BigInt(15)),
   new Uint64(BigInt(25)),
@@ -217,7 +217,7 @@ const messageHash = sha256(message);
 //const messageHash1 = sha256(msgBytes);
 
 // Signature Method : Sign a message through PrivateKey
-async function signMessage(
+export async function signMessage(
   privateKey: Ed25519PrivateKey,
   messageHash: Uint8Array
 ): Promise<Ed25519Signature> {
@@ -791,9 +791,6 @@ export async function adminTransferWithSignature(
     senderAuthenticator,
   });
   await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
-
-  // await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
-
   return pendingTxn.hash;
 }
 // Admin can transfer to any account's multiple user's reward field
@@ -1403,6 +1400,8 @@ async function main() {
   // );
   // console.log("🚀 ~ tx1_bulk:", tx2_bulk);
 
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+
   // let tx1_bulk = await transferReward3ToReward1BulkWithSign(
   //   owner,
   //   user1,
@@ -1972,6 +1971,8 @@ async function main() {
   //   signature
   // );
   // console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
   // let adminSignatureTxBulk = await adminTransferWithSignatureBulk(
   //   owner,

@@ -28,8 +28,9 @@ module FACoin::fa_coin {
     const EINVALID_ARGUMENTS_LENGTH: u64 = 6;
     const EINVALID_SIGNATURE: u64 = 7;
     const ESIGNATURE_ALREADY_USED: u64 = 8;
+    const EINVALID_ROLE: u64 = 9;
 
-    const PUBLIC_KEY: vector<u8> = x"625e1eca68c2b85f0f1899486e0fe2b0dffadad59e4d2ab534f01660fe9ebd24";
+    const PUBLIC_KEY: vector<u8> = x"8b52afdbe87b51902bf9a32621a1d93b53fa822d6d57aca576b9ff6f6b72c205";
     const ASSET_SYMBOL: vector<u8> = b"FA";
     const BUCKET_CORE_SEED: vector<u8> = b"BA";
         const BUCKET_COLLECTION_DESCRIPTION: vector<u8> = b"Bucket collections";
@@ -44,6 +45,22 @@ module FACoin::fa_coin {
         transfer_ref: TransferRef,
         burn_ref: BurnRef,
     }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Hold account which control the transfer of fungible assets. 
+    /// Stores the address of the address with ADMIN_TRANSFER_ROLE
+    struct AdminTransferRole has key {
+        transfer_role_vec: vector<address>, 
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Hold account which control the minting of fungible assets. 
+    /// Stores the address of the address with ADMIN_TRANSFER_ROLE
+    struct AdminMinterRole has key {
+        mint_role_vec: vector<address>, 
+    }
+
+
 
     /// Hold the nonce of the signer, to avoid duplication
     struct ManagedNonce has key{
@@ -137,6 +154,20 @@ module FACoin::fa_coin {
         create_bucket_store_collection(&bucket_signer);
 
         /*
+            Stores the global storage for the addresses of minter  role
+        */
+        let m_vec = vector::empty<address>();
+        vector::push_back<address>(&mut m_vec, signer::address_of(admin));
+        move_to(admin, AdminMinterRole{mint_role_vec: m_vec});
+
+        /*
+            Stores the global storage for the addresses of  admin transfer role
+        */
+        let t_vec = vector::empty<address>();
+        vector::push_back<address>(&mut t_vec, signer::address_of(admin));
+        move_to(admin, AdminTransferRole{transfer_role_vec: t_vec});
+
+        /*
          Here we're initializing the metadata for kcash fungible asset,
         */
         move_to(admin, ManagedNonce{nonce: 0});
@@ -162,9 +193,50 @@ module FACoin::fa_coin {
         )// <:!:initialize
     }
 
+    /* Verifies that minter is eligible for mint or not*/
+    fun verifyMinter(minter: address): bool acquires AdminMinterRole{
+        let m_vec = borrow_global<AdminMinterRole>(@FACoin).mint_role_vec;
+        let len = vector::length(&m_vec);
+        let res = false;
+        let i = 0;
+        loop {
+            let role = vector::borrow(&m_vec, i);
+            if(role == &minter){
+                res = true;
+                break
+            };
+            i = i + 1;
+            if (i >= len) break;
+        };
+        res
+    }
+
+    /* Verifies that admin_transfer is eligible for transfer or not*/
+    fun verifyAdminTransfer(admin_transfer: address): bool acquires AdminTransferRole{
+        let t_vec = borrow_global<AdminTransferRole>(@FACoin).transfer_role_vec;
+        let len = vector::length(&t_vec);
+        let res = false;
+        let i = 0;
+        loop {
+            let role = vector::borrow(&t_vec, i);
+            if(role == &admin_transfer){
+                res = true;
+                break
+            };
+            i = i + 1;
+            if (i >= len) break;
+        };
+        res
+    }
+
     #[view]
     public fun get_nonce(admin: address) : u64 acquires ManagedNonce{
         borrow_global_mut<ManagedNonce>(admin).nonce
+    }
+
+    #[view]
+    public fun get_minter(): vector<address> acquires AdminMinterRole{
+        borrow_global_mut<AdminMinterRole>(@FACoin).mint_role_vec
     }
 
     fun update_nonce(admin: address) acquires ManagedNonce{
@@ -173,8 +245,11 @@ module FACoin::fa_coin {
     }
 
 
-    // Verify signature
-    fun signature_verification(messageHash: vector<u8>, signature: vector<u8>): bool{
+    // Verify signature  TODO: nonce per user
+    fun signature_verification( admin: &signer, messageHash: vector<u8>, signature: vector<u8>, nonce: u64): bool acquires ManagedNonce{
+        let e_nonce = get_nonce(signer::address_of(admin));
+        assert!(nonce == e_nonce, error::permission_denied(ESIGNATURE_ALREADY_USED));
+
         // Generating Message Hash using sha2_256
         //let messageHash = hash::sha2_256(message);
 
@@ -200,10 +275,27 @@ module FACoin::fa_coin {
         additionToRecipient: vector<u64>
     }
 
+    struct UserTransferWithSign has drop, store{
+        from: address,
+        to: address,
+        amount: u64,
+        method: String,
+        nonce: u64
+    }
+
+    struct UserTransferWithSignBulk has drop, store {
+        from: address,
+        to_vec: vector<address>,
+        amount_vec: vector<u64>,
+        method: String,
+        nonce: u64
+    }
+
    
 
     // Admin Transfers with Signature
-    public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductnFromSender: vector<u64>, additnToRecipient: vector<u64>, signature: vector<u8>) acquires ManagedFungibleAsset, BucketStore, BucketCore {
+    public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductnFromSender: vector<u64>, additnToRecipient: vector<u64>, signature: vector<u8>, nonce: u64 ) 
+    acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce {
 
         let message = AdminTransferSignature{
             from: signer::address_of(admin),
@@ -216,7 +308,8 @@ module FACoin::fa_coin {
         let message_hash = hash::sha2_256(messag_bytes);
 
         // Verify designated signer with signature
-        let is_signature_valid = signature_verification(message_hash, signature);
+        let is_signature_valid = signature_verification(admin, message_hash, signature, nonce);
+        assert!(is_signature_valid, error::permission_denied(EINVALID_SIGNATURE));
 
         event::emit<MessageHash>(MessageHash{message, messag_bytes, message_hash, is_signature_valid});
 
@@ -238,8 +331,8 @@ module FACoin::fa_coin {
     }
 
     // Admin Transfers with Signature Bulk
-      public entry fun admin_transfer_with_signature_bulk(admin: &signer, to_vec: vector<address>, deductionFromSender_vec: vector<vector<u64>>, additionToRecipient_vec: vector<vector<u64>>, signature: vector<u8>)
-        acquires ManagedFungibleAsset, BucketStore, BucketCore{
+      public entry fun admin_transfer_with_signature_bulk(admin: &signer, to_vec: vector<address>, deductionFromSender_vec: vector<vector<u64>>, additionToRecipient_vec: vector<vector<u64>>, signature: vector<u8>, nonce: u64 )
+        acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce, AdminTransferRole{
 
         let message = AdminTransferSignatureBulk{
             from: signer::address_of(admin),
@@ -252,8 +345,8 @@ module FACoin::fa_coin {
         let message_hash = hash::sha2_256(messag_bytes);
 
         // Verify designated signer with signature
-        let is_signature_valid = signature_verification(message_hash, signature);
-
+        let is_signature_valid = signature_verification(admin, message_hash, signature, nonce);
+        assert!(is_signature_valid, error::permission_denied(EINVALID_SIGNATURE));
 
 
         assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
@@ -445,14 +538,15 @@ module FACoin::fa_coin {
             assert!(bs.reward3 >= amount, error::invalid_argument(EAMOUNT_SHOULD_BE_EQUAL_OR_LESS_THAN_BUCKET_ASSETS));
             bs.reward3 = bs.reward3 - amount;
         };
-        if (index == 1) deposit_to_bucket(user, 0, amount, 0) else deposit_to_bucket(user, 0, amount, 0);
+        if (index == 1) deposit_to_bucket(user, amount, 0, 0) else deposit_to_bucket(user, 0, amount, 0);
         transfer_internal(admin, signer::address_of(admin), user, amount);
     }
 
     /// Transfer private function which works with FA not for Bucket store
     fun transfer_internal(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset{
         let asset = get_metadata();
-        let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
+        // let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
+        let transfer_ref = authorized_borrow_transfer_refs(asset);
         let from_wallet = primary_fungible_store::primary_store(from, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
@@ -481,28 +575,37 @@ module FACoin::fa_coin {
 
     /* -----  Only admin can invoke these fun ----- */
     // :!:>mint
-    /// Mint as the owner of metadata object and deposit to a specific account.
-    public entry fun mint(admin: &signer, to: address, amount: u64, r1: u64, r2: u64, r3: u64) acquires ManagedFungibleAsset, BucketCore, BucketStore {
+    /// Mint as the owner of metadata object or the account with minter role and deposit to a specific account.
+    public entry fun mint(
+        admin: &signer, 
+        to: address, 
+        amount: u64, 
+        r1: u64, 
+        r2: u64, 
+        r3: u64
+    ) acquires ManagedFungibleAsset, BucketCore, BucketStore, AdminMinterRole {
+        assert!(verifyMinter(signer::address_of(admin)), error::invalid_argument(EINVALID_ROLE));
         assert!(r1+r2+r3 == amount, error::invalid_argument(EAMOUNT_SHOULD_BE_EQUAL_TO_ASSETS));
         let asset = get_metadata();
-        let managed_fungible_asset = authorized_borrow_refs(admin, asset);
+        let mint_ref_borrow = authorized_borrow_mint_refs(admin, asset);
+        let transfer_ref_borrow = authorized_borrow_transfer_refs(asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
 
-        let fa = fungible_asset::mint(&managed_fungible_asset.mint_ref, amount);
+        let fa = fungible_asset::mint(mint_ref_borrow, amount);
         // create a store if not exist and deposit the values in bucket
         deposit_to_bucket(to, r1, r2, r3);
-        fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
+        fungible_asset::deposit_with_ref(transfer_ref_borrow, to_wallet, fa);
 
         // Freeeze the account so that native trnsfer would not work
-        let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         // let wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
-        fungible_asset::set_frozen_flag(transfer_ref, to_wallet, true);
+        fungible_asset::set_frozen_flag(transfer_ref_borrow, to_wallet, true);
 
     }// <:!:mint_to
 
     /// Mint as the owner of metadata object and deposit to specific account in bulk
     public entry fun bulk_mint(admin: &signer, to_vec: vector<address>, amt_vec: vector<u64>, r1_vec: vector<u64>, r2_vec: vector<u64>, r3_vec: vector<u64>)
-        acquires ManagedFungibleAsset, BucketCore, BucketStore{
+        acquires ManagedFungibleAsset, BucketCore, BucketStore, AdminMinterRole{
+        assert!(verifyMinter(signer::address_of(admin)), error::invalid_argument(EINVALID_ROLE));
         let len = vector::length(&to_vec);
         let i = 0;
         loop {
@@ -515,6 +618,22 @@ module FACoin::fa_coin {
             i = i + 1;
             if (i >= len) break;
         }
+    }
+
+    /* To assign minter role to an address 
+        Only admin can invoke this*/
+    public entry fun add_minter(admin: &signer, new_minter: address) acquires AdminMinterRole{
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let mint_struct = borrow_global_mut<AdminMinterRole>(@FACoin);
+        vector::push_back<address>(&mut mint_struct.mint_role_vec, new_minter);
+    }
+
+    /* To assign transfer role to an address 
+        Only admin can invoke this*/
+    public entry fun add_admin_transfer(admin: &signer, new_admin_transfer: address) acquires AdminTransferRole{
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let transfer_struct = borrow_global_mut<AdminTransferRole>(@FACoin);
+        vector::push_back<address>(&mut transfer_struct.transfer_role_vec, new_admin_transfer);
     }
 
     /**
@@ -530,9 +649,9 @@ module FACoin::fa_coin {
      * @param additionToRecipient The vec containing the rewards to be added to the recipient.
     */
     public entry fun admin_transfer(admin: &signer, to: address, deductionFromSender: vector<u64>, additionToRecipient: vector<u64>)
-        acquires ManagedFungibleAsset, BucketStore, BucketCore
+        acquires ManagedFungibleAsset, BucketStore, BucketCore, AdminTransferRole
     {
-        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        assert!(verifyAdminTransfer(signer::address_of(admin)), error::invalid_argument(EINVALID_ROLE));
         assert!(vector::length(&deductionFromSender) == vector::length(&additionToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
         let (r1, r2, r3) = (*vector::borrow(&deductionFromSender, 0), *vector::borrow(&deductionFromSender, 1), *vector::borrow(&deductionFromSender, 2));
         withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
@@ -552,7 +671,7 @@ module FACoin::fa_coin {
      * - Only the role with ADMIN_TRANSFER_ROLE can call this function.
     */
     public entry fun admin_transfer_bulk(admin: &signer, to_vec: vector<address>, deductionFromSender_vec: vector<vector<u64>>, additionToRecipient_vec: vector<vector<u64>>)
-        acquires ManagedFungibleAsset, BucketStore, BucketCore{
+        acquires ManagedFungibleAsset, BucketStore, BucketCore, AdminTransferRole{
         assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
         let len = vector::length(&deductionFromSender_vec);
         assert!(len == vector::length(&additionToRecipient_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
@@ -774,9 +893,20 @@ module FACoin::fa_coin {
      * @dev Transfers an amount from the reward3 bucket to the reward1 bucket.
      * @param signature The signature containing the transfer details.
     */
-    public entry fun transfer_reward3_to_reward1(admin: &signer, from: &signer, to: address, amount: u64, signature: vector<u8>, message: vector<u8>, nonce: u64) 
+    public entry fun transfer_reward3_to_reward1(admin: &signer, from: &signer, to: address, amount: u64, signature: vector<u8>) 
     acquires ManagedFungibleAsset, BucketCore, BucketStore, ManagedNonce{
-        let is_signature_valid = signature_verification( admin, message, signature, nonce);
+        let nonce = get_nonce(signer::address_of(admin));
+        let message = UserTransferWithSign{
+            from: signer::address_of(from),
+            to,
+            amount,
+            method: string::utf8(b"transfer_reward3_to_reward1"),
+            nonce
+        };
+        
+        let messag_bytes = bcs::to_bytes<UserTransferWithSign>(&message);
+        let message_hash = hash::sha2_256(messag_bytes);
+        let is_signature_valid = signature_verification( admin, message_hash, signature, nonce);
         assert!(is_signature_valid, error::permission_denied(EINVALID_SIGNATURE));
 
         assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
@@ -792,11 +922,24 @@ module FACoin::fa_coin {
      * - The `to_vec` and `to_vec` vectors must have the same length.
      * - The caller must have sufficient balance of Reward3 tokens.
     */
-    public entry fun transfer_reward3_to_reward1_bulk(admin: &signer, from: &signer, to_vec: vector<address>, amount_vec: vector<u64>, signature: vector<u8>, message: vector<u8>, nonce: u64) 
+    public entry fun transfer_reward3_to_reward1_bulk(admin: &signer, from: &signer, to_vec: vector<address>, amount_vec: vector<u64>, signature: vector<u8>) 
     acquires ManagedFungibleAsset, BucketCore, BucketStore, ManagedNonce{
         let len = vector::length(&to_vec);
         assert!(len == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
-        let is_signature_valid = signature_verification( admin, message, signature, nonce);
+
+        let nonce = get_nonce(signer::address_of(admin));
+        // creating a struct for bulk transfer
+        let message = UserTransferWithSignBulk{
+            from: signer::address_of(from),
+            to_vec,
+            amount_vec,
+            method: string::utf8(b"transfer_reward3_to_reward1_bulk"),
+            nonce
+        };
+        
+        let messag_bytes = bcs::to_bytes<UserTransferWithSignBulk>(&message);
+        let message_hash = hash::sha2_256(messag_bytes);
+        let is_signature_valid = signature_verification( admin, message_hash, signature, nonce);
         assert!(is_signature_valid, error::permission_denied(EINVALID_SIGNATURE));
 
         assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
@@ -816,9 +959,19 @@ module FACoin::fa_coin {
      * @dev Transfers an amount from the reward3 bucket to the reward2 bucket.
      * @param signature The signature containing the transfer details.
     */
-    public entry fun transfer_reward3_to_reward2(admin: &signer, from: &signer, to: address, amount: u64, signature: vector<u8>, message: vector<u8>, nonce: u64) 
+    public entry fun transfer_reward3_to_reward2(admin: &signer, from: &signer, to: address, amount: u64, signature: vector<u8>) 
     acquires ManagedFungibleAsset, BucketCore, BucketStore, ManagedNonce{
-        let is_signature_valid = signature_verification( admin, message, signature, nonce);
+        let nonce = get_nonce(signer::address_of(admin));
+        let message = UserTransferWithSign{
+            from: signer::address_of(from),
+            to,
+            amount,
+            method: string::utf8(b"transfer_reward3_to_reward2"),
+            nonce
+        };
+        let messag_bytes = bcs::to_bytes<UserTransferWithSign>(&message);
+        let message_hash = hash::sha2_256(messag_bytes);
+        let is_signature_valid = signature_verification( admin, message_hash, signature, nonce);
         assert!(is_signature_valid, error::permission_denied(EINVALID_SIGNATURE));
 
         assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
@@ -834,11 +987,24 @@ module FACoin::fa_coin {
      * - The `to_vec` and `to_vec` vectors must have the same length.
      * - The caller must have sufficient balance of Reward3 tokens.
     */
-    public entry fun transfer_reward3_to_reward2_bulk(admin: &signer, from: &signer, to_vec: vector<address>, amount_vec: vector<u64>, signature: vector<u8>, message: vector<u8>, nonce: u64) 
+     public entry fun transfer_reward3_to_reward2_bulk(admin: &signer, from: &signer, to_vec: vector<address>, amount_vec: vector<u64>, signature: vector<u8>) 
     acquires ManagedFungibleAsset, BucketCore, BucketStore, ManagedNonce{
         let len = vector::length(&to_vec);
         assert!(len == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
-        let is_signature_valid = signature_verification( admin, message, signature, nonce);
+
+        let nonce = get_nonce(signer::address_of(admin));
+        // creating a struct for bulk transfer
+        let message = UserTransferWithSignBulk{
+            from: signer::address_of(from),
+            to_vec,
+            amount_vec,
+            method: string::utf8(b"transfer_reward3_to_reward2_bulk"),
+            nonce
+        };
+        
+        let messag_bytes = bcs::to_bytes<UserTransferWithSignBulk>(&message);
+        let message_hash = hash::sha2_256(messag_bytes);
+        let is_signature_valid = signature_verification( admin, message_hash, signature, nonce);
         assert!(is_signature_valid, error::permission_denied(EINVALID_SIGNATURE));
 
         assert!(has_bucket_store(signer::address_of(from)), error::invalid_argument(EUSER_DO_NOT_HAVE_BUCKET_STORE));
@@ -846,7 +1012,7 @@ module FACoin::fa_coin {
         loop {
             let to = vector::borrow(&to_vec, i);
             let amount = vector::borrow(&amount_vec, i);
-            user_transfer_internal(admin, from, *to, *amount, 1);
+            user_transfer_internal(admin, from, *to, *amount, 0);
             i = i + 1;
             if (i >= len) break;
         };
@@ -891,6 +1057,18 @@ module FACoin::fa_coin {
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
+    }
+
+
+    inline fun authorized_borrow_mint_refs(owner: &signer, asset: Object<Metadata>, ): &MintRef acquires ManagedFungibleAsset, AdminMinterRole{
+        assert!(verifyMinter(signer::address_of(owner)), error::invalid_argument(EINVALID_ROLE));
+        let ref = borrow_global<ManagedFungibleAsset>(object::object_address(&asset));
+        &ref.mint_ref
+    }
+
+    inline fun authorized_borrow_transfer_refs(asset: Object<Metadata>, ): &TransferRef acquires ManagedFungibleAsset{
+        let ref = borrow_global<ManagedFungibleAsset>(object::object_address(&asset));
+        &ref.transfer_ref
     }
     
 

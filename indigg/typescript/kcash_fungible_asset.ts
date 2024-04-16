@@ -1279,6 +1279,62 @@ async function main() {
   console.log("🚀 ~ adMint:", adMint);
 
   console.log("Updated minters list: ", await getMinterList(owner));
+  // let owner_mint = 1000 * decimal_kcash;
+  let user_mint = 10000 * decimal_kcash;
+ 
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+ 
+// let mTxU = await mintCoin(
+//     owner,
+//     user1,
+//     user_mint,
+//     user_mint * 0.3,
+//     user_mint * 0.4,
+//     user_mint * 0.3
+//   );
+//   await aptos.waitForTransaction({ transactionHash: mTxU });
+//   console.log("🚀 ~ mTx:", mTxU);
+
+//   console.log(
+//     `Owner's KCash balance after mint: ${await getFaBalance(
+//       user1,
+//       metadataAddress
+//     )}.`
+//   );
+//   console.log("Owner bucket store :", await getBucketStore(owner));
+//   console.log("User1 bucket store :", await getBucketStore(user1));
+//   console.log("User1 bucket store :", await getBucketStore(user2));
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // **** transferFromBucketToReward3 *****
+  // let tb3Tx = await transferFromBucketToReward3(
+  //   owner,
+  //   user1,
+  //   user2.accountAddress,
+  //   [10, 10, 5]
+  // );
+  // console.log("🚀 ~ transferFromBucketToReward3 transaction:", tb3Tx);
+  // console.log("User1 bucket store :", await getBucketStore(user1));
+  // console.log("User2 bucket store :", await getBucketStore(user2));
+
+  // **** transfer_to_reward3_bulk *****
+  // console.log("User1 bucket store :", await getBucketStore(user1));
+  // console.log("User2 bucket store :", await getBucketStore(user2));
+  // let bulkTx3 = await transferFromBucketToReward3Bulk(
+  //   owner,
+  //   user1,
+  //   [user2.accountAddress, owner.accountAddress],
+  //   [
+  //     [1, 10, 5],
+  //     [10, 1, 5],
+  //   ]
+  // );
+  // console.log("🚀 ~ bulkTx3:", bulkTx3);
+  // console.log("User1 bucket store :", await getBucketStore(user1));
+  // console.log("User2 bucket store :", await getBucketStore(user2));
+
+  /////////////////////////////////////////////////////////////////////////////////////////////////////
   
 
   let owner_mint = 1000 * decimal_kcash;

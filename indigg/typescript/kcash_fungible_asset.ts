@@ -2,10 +2,6 @@
 /* eslint-disable max-len */
 
 import {
-  MoveStruct,
-  MoveStructField,
-  MoveScriptBytecode,
-  MoveStructId,
   Serializable,
   Serializer,
   Account,
@@ -25,20 +21,10 @@ import {
 
 import { compilePackage, getPackageBytesToPublish } from "./utils";
 import fs from "fs";
-import sha256, { hash } from "fast-sha256";
-
-/**
- * This example demonstrate how one can compile, deploy, and mint its own fungible asset (FA)
- * It uses the fa_coin.move module that can be found in the move folder
- *
- * Before running this example, we should compile the package locally:
- * 1. Acquire the Aptos CLI, see https://aptos.dev/cli-tools/aptos-cli/use-cli/install-aptos-cli
- * 2. cd `~/aptos-ts-sdk/examples/typescript`
- * 3. Run `pnpm run your_coin`
- */
+import sha256 from "fast-sha256";
 
 // Setup the client
-const APTOS_NETWORK: Network = NetworkToNetworkName[Network.TESTNET];
+const APTOS_NETWORK: Network = NetworkToNetworkName[Network.DEVNET];
 console.log("APTOS_NETWORK3000", APTOS_NETWORK);
 
 const config = new AptosConfig({ network: APTOS_NETWORK });
@@ -66,7 +52,9 @@ class MessageMoveStruct extends Serializable {
     public from: AccountAddress, // where AccountAddress extends Serializable
     public to: AccountAddress, // where AccountAddress extends Serializable
     public deductionFromSender: Uint64[],
-    public additionToRecipient: Uint64[]
+    public additionToRecipient: Uint64[],
+    public method: string,
+    public nonce: Uint64
   ) {
     super();
   }
@@ -84,6 +72,9 @@ class MessageMoveStruct extends Serializable {
     for (const uint64 of this.additionToRecipient) {
       serializer.serialize(uint64);
     }
+
+    serializer.serializeStr(this.method);
+    serializer.serialize(this.nonce);
   }
 }
 
@@ -94,31 +85,139 @@ const deductionFromSender = [
 ];
 
 const additionToRecipient = [
+  new Uint64(BigInt(10)),
+  new Uint64(BigInt(20)),
+  new Uint64(BigInt(30)),
+];
+
+export async function createStructForAdminTransferSig(
+  admin: AccountAddress,
+  to: AccountAddress,
+  deductionFromSender: Uint64[],
+  additionToRecipient: Uint64[],
+  method: String,
+  nonce: Uint64
+) {
+  const adminStructForSign = new MessageMoveStruct(
+    admin,
+    to,
+    deductionFromSender,
+    additionToRecipient,
+    method.toString(),
+    nonce
+  );
+  return adminStructForSign;
+}
+
+
+class MessageMoveStructBulk extends Serializable {
+  constructor(
+    public from: AccountAddress, // where AccountAddress extends Serializable
+    public to: AccountAddress[],
+    public deductnFromSender1: Uint64[],
+    public deductnFromSender2: Uint64[],
+    public deductnFromSender3: Uint64[],
+    public additnToRecipient1: Uint64[],
+    public additnToRecipient2: Uint64[],
+    public additnToRecipient3: Uint64[],
+    public method: string,
+    public nonce: Uint64
+  ) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serialize(this.from); // Composable serialization of another Serializable object
+    serializer.serializeU32AsUleb128(this.to.length);
+    for (const address of this.to) {
+      serializer.serialize(address);
+    }
+    serializer.serializeU32AsUleb128(deductnFromSender1.length);
+    for (const uint64 of this.deductnFromSender1) {
+      serializer.serialize(uint64);
+    }
+    serializer.serializeU32AsUleb128(deductnFromSender2.length);
+    for (const uint64 of this.deductnFromSender2) {
+      serializer.serialize(uint64);
+    }
+    serializer.serializeU32AsUleb128(deductnFromSender3.length);
+    for (const uint64 of this.deductnFromSender3) {
+      serializer.serialize(uint64);
+    }
+    serializer.serializeU32AsUleb128(additnToRecipient1.length);
+    for (const uint64 of this.additnToRecipient1) {
+      serializer.serialize(uint64);
+    }
+    serializer.serializeU32AsUleb128(additnToRecipient2.length);
+    for (const uint64 of this.additnToRecipient2) {
+      serializer.serialize(uint64);
+    }
+    serializer.serializeU32AsUleb128(additnToRecipient3.length);
+    for (const uint64 of this.additnToRecipient3) {
+      serializer.serialize(uint64);
+    }
+    serializer.serializeStr(this.method);
+    serializer.serialize(this.nonce);
+  }
+}
+
+const deductnFromSender1 = [
+  new Uint64(BigInt(10)),
+  new Uint64(BigInt(20)),
+  new Uint64(BigInt(30)),
+];
+const deductnFromSender2 = [
   new Uint64(BigInt(5)),
   new Uint64(BigInt(15)),
   new Uint64(BigInt(25)),
 ];
+const deductnFromSender3 = [
+  new Uint64(BigInt(100)),
+  new Uint64(BigInt(200)),
+  new Uint64(BigInt(300)),
+];
+const additnToRecipient1 = [
+  new Uint64(BigInt(10)),
+  new Uint64(BigInt(20)),
+  new Uint64(BigInt(30)),
+];
+const additnToRecipient2 = [
+  new Uint64(BigInt(5)),
+  new Uint64(BigInt(15)),
+  new Uint64(BigInt(25)),
+];
+const additnToRecipient3 = [
+  new Uint64(BigInt(100)),
+  new Uint64(BigInt(200)),
+  new Uint64(BigInt(300)),
+];
 
-/*
-interface IMessage {
-  from: AccountAddress;
-  to: AccountAddress;
-  deductionFromSender: {
-    reward1: number;
-    reward2: number;
-    reward3: number;
-  };
-  additionToRecipient: {
-    reward1: number;
-    reward2: number;
-    reward3: number;
-  };
+export async function createStructForAdminTransferSigBulk(
+  admin: AccountAddress,
+  to: AccountAddress[],
+  deductnFromSender1: Uint64[],
+  deductnFromSender2: Uint64[],
+  deductnFromSender3: Uint64[],
+  additnToRecipient1: Uint64[],
+  additnToRecipient2: Uint64[],
+  additnToRecipient3: Uint64[],
+  method: String,
+  nonce: Uint64
+) {
+  const adminStructForSignBulk = new MessageMoveStructBulk(
+    admin,
+    to,
+    deductnFromSender1,
+    deductnFromSender2,
+    deductnFromSender3,
+    additnToRecipient1,
+    additnToRecipient2,
+    additnToRecipient3,
+    method.toString(),
+    nonce
+  );
+  return adminStructForSignBulk;
 }
-*/
-
-// MoveStruct {
-
-// }
 
 // const owner_amount_to_mint = 1000*decimal_kcash;
 // const amount_to_mint = 10000000000;
@@ -137,37 +236,6 @@ let user2_kp = JSON.parse(fs.readFileSync("./keys/user2.json", "utf8"));
 const privateKeyuser2 = new Ed25519PrivateKey(user2_kp.privateKey);
 const user2 = Account.fromPrivateKey({ privateKey: privateKeyuser2 });
 
-/*
-let message1: IMessage = {
-  from: user1.accountAddress,
-  to: user2.accountAddress,
-  deductionFromSender: {
-    reward1: 10,
-    reward2: 20,
-    reward3: 30,
-  },
-  additionToRecipient: {
-    reward1: 5,
-    reward2: 15,
-    reward3: 25,
-  },
-};
-*/
-
-// let moveStructInstance:MoveStruct ={
-//   name:"abc",
-//   fields:[ ]
-// };
-
-// Convert message1 to JSON string
-// const jsonString: string = JSON.stringify(message1);
-
-// const encoder = new TextEncoder();
-// const msgBytes: Uint8Array = encoder.encode(message1.toString());
-// const msgBytes = bcsTobytes(message1);
-//Serializer.bcsToBytes(message1);
-//const bytes: Uint8Array = bcs.serialize(message1);
-
 // Message & Hash
 const message = new Uint8Array(Buffer.from("KCash"));
 const messageHash = sha256(message);
@@ -181,26 +249,6 @@ async function signMessage(
   const signature = await privateKey.sign(messageHash);
   return signature;
 }
-/*
-
-// Signature Verification Method : Verify signature through Public Key
-async function signatureVerification(message: Uint8Array, public_key: Uint8Array, signature: Ed25519Signature, owner: Account) {
-  const transaction = await aptos.transaction.build.simple({sender: owner.accountAddress, data: {
-      function: `${owner.accountAddress}::fa_coin::signatureVerification`,
-      functionArguments: [message, public_key, signature.toUint8Array()],
-    },
-  });
-
-  const senderAuthenticator = await aptos.transaction.sign({signer: owner, transaction,});
-  const pendingTxn = await aptos.transaction.submit.simple({transaction, senderAuthenticator,});
-  console.log("🚀 ~ signatureVerification ~ pendingTxn:", pendingTxn.hash);
-
-  await aptos.waitForTransaction({transactionHash: pendingTxn.hash,});
-  console.log("Verification Done");
-
-  return pendingTxn.hash;
-}
-*/
 
 // Admin Transfer with Signature
 export async function adminTransferWithSignature(
@@ -208,7 +256,10 @@ export async function adminTransferWithSignature(
   toAddress: AccountAddress,
   deductionFromSender: AnyNumber[],
   additionToRecipient: AnyNumber[],
-  signature: Ed25519Signature
+  signature: Ed25519Signature,
+  method: string,
+  nonce: AnyNumber
+
 ): Promise<string> {
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
@@ -219,6 +270,8 @@ export async function adminTransferWithSignature(
         deductionFromSender,
         additionToRecipient,
         signature.toUint8Array(),
+        method,
+        nonce
       ],
     },
   });
@@ -238,14 +291,32 @@ export async function adminTransferWithSignature(
 export async function adminTransferWithSignatureBulk(
   admin: Account,
   to: AccountAddress[],
-  deductionFromSender: AnyNumber[][],
-  additionToRecipient: AnyNumber[][]
+  deductnFromSender1: AnyNumber[],
+  deductnFromSender2: AnyNumber[],
+  deductnFromSender3: AnyNumber[],
+  additnToRecipient1: AnyNumber[],
+  additnToRecipient2: AnyNumber[],
+  additnToRecipient3: AnyNumber[],
+  signature: Ed25519Signature,
+  method: string,
+  nonce: AnyNumber
 ) {
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
       function: `${admin.accountAddress}::fa_coin::admin_transfer_with_signature_bulk`,
-      functionArguments: [to, deductionFromSender, additionToRecipient],
+      functionArguments: [
+        to,
+        deductnFromSender1,
+        deductnFromSender2,
+        deductnFromSender3,
+        additnToRecipient1,
+        additnToRecipient2,
+        additnToRecipient3,
+        signature.toUint8Array(),
+        method,
+        nonce
+      ],
     },
   });
   const senderAuthenticator = await aptos.transaction.sign({
@@ -638,7 +709,10 @@ export async function compileAndDeploy() {
 }
 
 async function main() {
-  // await aptos.fundAccount({accountAddress: owner.accountAddress, amount: 100000000});
+  // await aptos.fundAccount({
+  //   accountAddress: owner.accountAddress,
+  //   amount: 100000000,
+  // });
   console.log("🚀 ~ messageHash1:", messageHash.toString());
 
   console.log("\n=== Addresses ===");
@@ -916,22 +990,44 @@ async function main() {
     owner.accountAddress,
     user2.accountAddress,
     deductionFromSender,
-    additionToRecipient
+    additionToRecipient,
+    "admin_transfer_with_signature",
+    new Uint64(BigInt(10))
+  );
+
+  // Object of Move Struct Bulk
+  const moveStructBulk = new MessageMoveStructBulk(
+    owner.accountAddress,
+    [user2.accountAddress, owner.accountAddress, user1.accountAddress],
+    deductnFromSender1,
+    deductnFromSender2,
+    deductnFromSender3,
+    additnToRecipient1,
+    additnToRecipient2,
+    additnToRecipient3,
+    "admin_transfer_with_signature_bulk",
+    new Uint64(BigInt(20))
   );
 
   // Construct a MoveStruct
   const moveStructBytes = moveStruct.bcsToBytes();
-  const msgMoveByteBuffer = Buffer.from(moveStructBytes.toString());
-  const msgMoveStructBytehexString = "0x" + msgMoveByteBuffer.toString("hex");
 
-  console.log("🚀 ~ moveStructBytes:", msgMoveStructBytehexString);
+  const moveStructBytesBulk = moveStructBulk.bcsToBytes();
+
+  // const msgMoveByteBuffer = Buffer.from(moveStructBytes.toString());
+  // const msgMoveStructBytehexString = "0x" + msgMoveByteBuffer.toString("hex");
+
+  // console.log("🚀 ~ moveStructBytes:", msgMoveStructBytehexString);
 
   // Generating message hash
   // const messageMoveStructHash = "0xeaa9b8a41ee0fe9748bc20f9e3b1e09a245ac024a30d08b0d2cffddfe13035d4";
   // const buffer = Buffer.from(messageMoveStructHash.slice(2), 'hex');
 
   const messageMoveStructHash = sha256(moveStructBytes);
-  console.log("🚀 ~ messageMoveStructHash:", messageMoveStructHash.toString());
+
+  const messageMoveStructBulkHash = sha256(moveStructBytesBulk);
+
+  // console.log("🚀 ~ messageMoveStructHash:", messageMoveStructHash.toString());
 
   // Convert the hash array to a Buffer
   const msgMoveBuffer = Buffer.from(messageMoveStructHash.toString());
@@ -942,8 +1038,15 @@ async function main() {
 
   // Signing a Message
   const signature = await signMessage(privateKeyOwner, messageMoveStructHash);
+
+  const signatureBulk = await signMessage(
+    privateKeyOwner,
+    messageMoveStructBulkHash
+  );
+
   console.log("=============================================");
   console.log("Signature: ", signature.toString());
+  console.log("SignatureBulk: ", signatureBulk.toString());
   console.log("=============================================");
 
   // Admin Transfer with Signature
@@ -951,24 +1054,30 @@ async function main() {
     owner,
     user2.accountAddress,
     [10, 20, 30],
-    [5, 15, 25],
-    signature
+    [10, 20, 30],
+    signature,
+    "admin_transfer_with_signature",
+    10
   );
   console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
 
+/*
+  // =======
   let adminSignatureTxBulk = await adminTransferWithSignatureBulk(
     owner,
-    [user2.accountAddress, user1.accountAddress],
-    [
-      [1, 2, 3],
-      [4, 5, 3],
-    ],
-    [
-      [3, 1, 2],
-      [6, 0, 6],
-    ]
+    [user2.accountAddress, owner.accountAddress, user1.accountAddress],
+    [10, 20, 30],
+    [5, 15, 25],
+    [100, 200, 300],
+    [10, 20, 30],
+    [5, 15, 25],
+    [100, 200, 300],
+    signatureBulk,
+    "admin_transfer_with_signature_bulk",
+    20
   );
-
+  console.log("adminSignatureTxBulk", adminSignatureTxBulk);
+*/
   console.log("done.");
 }
 

@@ -171,7 +171,7 @@ module FACoin::fa_coin {
             Stores the global storage for the addresses of  signer role
         */
         let s_vec = vector::empty<vector<u8>>();
-        vector::push_back<vector<u8>>(&mut s_vec, x"1d141a53581ed61921cf218d0c4ff1192851620b5582adb1226bcfb65f378da6");
+        vector::push_back<vector<u8>>(&mut s_vec, x"e31ec21206d8d38f5a28298a8e2fc5def690e32e0b38c921dd5532e13c3e8bdb");
         move_to(admin, AdminSigner{signer_vec: s_vec});
 
         /*
@@ -303,9 +303,14 @@ module FACoin::fa_coin {
             
             // Verifying Signature using Message Hash and public key
             res = ed25519::signature_verify_strict(&signatureEd, &unValidatedPublickkey, messageHash);
-            if(res) break;
-            i = i + 1;
-            if (i >= len) break;
+            if(res) {
+                event::emit<SignVerify>(SignVerify{message:messageHash, signatureEd, result: true});
+                return true
+            }
+            else{
+                i = i + 1;
+                if (i >= len) break;
+            }
         };
         event::emit<SignVerify>(SignVerify{message:messageHash, signatureEd, result: res});
         return res

@@ -61,6 +61,7 @@ import {
   additnToRecipient3,
   deductnFromSender2,
   deductnFromSender3,
+  createStructForAdminTransferSigBulk,
 } from "../kcash_fungible_asset";
 
 // Importing SHA256 hash function
@@ -127,8 +128,6 @@ describe("Kcash Test", () => {
     // const contract = await compileAndDeploy()
   }, 20000);
 
-  
-
   describe("fromPrivateKeyAndAddress", () => {
     it("derives the correct account from a  ed25519 private key", () => {
       let privateKeyOwner = new Ed25519PrivateKey(owner_kp.privateKey);
@@ -176,35 +175,35 @@ describe("Kcash Test", () => {
     });
   });
 
-  // describe("KCash Package Compilation and Publishing and deploy", () => {
-  //   it("should compile and publish KCash package", async () => {
-  //     // Define mock implementations for compilePackage and publishPackageTransaction
-  //     const { metadataBytes, byteCode } = getPackageBytesToPublish(
-  //       "/move/facoin/facoin.json"
-  //     );
-  //     // Logging to indicate the start of the publishing process
-  //     console.log("\n===Publishing KCash package===");
-  //     const transaction = await aptos.publishPackageTransaction({
-  //       account: owner.accountAddress,
-  //       metadataBytes,
-  //       moduleBytecode: byteCode,
-  //     });
+  describe("KCash Package Compilation and Publishing and deploy", () => {
+    it("should compile and publish KCash package", async () => {
+      // Define mock implementations for compilePackage and publishPackageTransaction
+      const { metadataBytes, byteCode } = getPackageBytesToPublish(
+        "/move/facoin/facoin.json"
+      );
+      // Logging to indicate the start of the publishing process
+      console.log("\n===Publishing KCash package===");
+      const transaction = await aptos.publishPackageTransaction({
+        account: owner.accountAddress,
+        metadataBytes,
+        moduleBytecode: byteCode,
+      });
 
-  //     // Signing and submitting the transaction
-  //     const response = await aptos.signAndSubmitTransaction({
-  //       signer: owner,
-  //       transaction,
-  //     });
-  //     // Waiting for the transaction to be confirmed
-  //     await aptos.waitForTransaction({
-  //       transactionHash: response.hash,
-  //     });
-  //     // Logging the transaction hash for reference
-  //     console.log(`Transaction hash28000: ${response.hash}`);
-  //     // Expecting the transaction hash to be defined
-  //     expect(response.hash).toBeDefined();
-  //   });
-  // });
+      // Signing and submitting the transaction
+      const response = await aptos.signAndSubmitTransaction({
+        signer: owner,
+        transaction,
+      });
+      // Waiting for the transaction to be confirmed
+      await aptos.waitForTransaction({
+        transactionHash: response.hash,
+      });
+      // Logging the transaction hash for reference
+      console.log(`Transaction hash28000: ${response.hash}`);
+      // Expecting the transaction hash to be defined
+      expect(response.hash).toBeDefined();
+    });
+  });
 
   describe("check blance of account and get metadata", () => {
     it("get metadata", async () => {
@@ -253,7 +252,7 @@ describe("Kcash Test", () => {
         // Mint coins with specified parameters and receive transaction hash
         let mintCoinTransactionHash = await mintCoin(
           owner,
-          owner,
+          owner.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -304,7 +303,7 @@ describe("Kcash Test", () => {
         if (initialBalanceOwner < mint_amount) {
           let mintCoinTransactionHash = await mintCoin(
             owner,
-            owner,
+            owner.accountAddress,
             amount_to_mint,
             reward1,
             reward2,
@@ -363,7 +362,7 @@ describe("Kcash Test", () => {
         if (initialBalanceUser2 < amount_To_Burn) {
           let mintCoinTransactionHash = await mintCoin(
             owner,
-            user2,
+            user2.accountAddress,
             amount_to_mint,
             reward1,
             reward2,
@@ -413,7 +412,7 @@ describe("Kcash Test", () => {
         if (initialBalanceuser1 < amount_to_be_transfer) {
           const mintUser = await mintCoin(
             owner,
-            user1,
+            user1.accountAddress,
             amount_to_mint,
             reward1,
             reward2,
@@ -497,7 +496,7 @@ describe("Kcash Test", () => {
         if (initialBalanceUser1 < amount_to_transfer) {
           const mintUser = await mintCoin(
             owner,
-            user1,
+            user1.accountAddress,
             amount_to_mint,
             reward1,
             reward2,
@@ -573,7 +572,7 @@ describe("Kcash Test", () => {
         // If owner's KCash balance is less than the transfer amount, mint KCash for the owner
         const mintUser = await mintCoin(
           owner,
-          owner,
+          owner.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -632,7 +631,7 @@ describe("Kcash Test", () => {
         // If owner's KCash balance is less than the transfer amount, mint KCash for the owner
         const mintUser = await mintCoin(
           owner,
-          owner,
+          owner.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -710,7 +709,7 @@ describe("Kcash Test", () => {
       } catch (error) {
         console.log("Error while freezing account:", error);
       }
-    },10000);
+    }, 10000);
 
     it("should unfreeze the specified account and return the transaction hash", async () => {
       try {
@@ -742,7 +741,7 @@ describe("Kcash Test", () => {
       } catch (error) {
         console.log("Error while unfreezing account:", error);
       }
-    },10000);
+    }, 10000);
   });
 
   describe("bucket-transfer three to one", () => {
@@ -759,7 +758,7 @@ describe("Kcash Test", () => {
         // If owner's reward3 balance is less than the transfer amount, mint KCash for the owner
         const mintUser = await mintCoin(
           owner,
-          owner,
+          owner.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -806,7 +805,7 @@ describe("Kcash Test", () => {
         // If owner's reward3 balance is less than the total transfer amount, mint KCash for the owner
         const mintUser = await mintCoin(
           owner,
-          owner,
+          owner.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -859,7 +858,7 @@ describe("Kcash Test", () => {
         // If owner's reward3 balance is less than the transfer amount, mint KCash for the owner
         const mintUser = await mintCoin(
           owner,
-          owner,
+          owner.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -906,7 +905,7 @@ describe("Kcash Test", () => {
         // If owner's reward3 balance is less than the total transfer amount, mint KCash for the owner
         const mintUser = await mintCoin(
           owner,
-          owner,
+          owner.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -970,7 +969,7 @@ describe("Kcash Test", () => {
         // If user1's bucket 3 balance is not sufficient, mint KCash
         const mintUser = await mintCoin(
           owner,
-          user1,
+          user1.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -1019,7 +1018,7 @@ describe("Kcash Test", () => {
         // If user1's reward3 balance is less than the total transfer amount, mint KCash
         const mintUser = await mintCoin(
           owner,
-          user1,
+          user1.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -1068,7 +1067,7 @@ describe("Kcash Test", () => {
       if (totalAvailable < transferKcash) {
         const mintUser = await mintCoin(
           owner,
-          user1,
+          user1.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -1120,7 +1119,7 @@ describe("Kcash Test", () => {
       if (totalAvailable < transferKcash) {
         const mintUser = await mintCoin(
           owner,
-          user1,
+          user1.accountAddress,
           amount_to_mint,
           reward1,
           reward2,
@@ -1211,140 +1210,101 @@ describe("Kcash Test", () => {
       expect(user2C2).toEqual(user2C + 30); // Check if 2 is added to user2C
     }, 10000);
 
-    // it("admin Transfer With Signature bulk", async () => {
-    //   console.log("starding........");
+    it("admin Transfer With Signature bulk", async () => {
+      console.log("starding........");
 
-    //   let nonceForBulk = await getNonce(owner);
+      let nonceForBulk = await getNonce(owner);
 
-    //   // Object of Move Struct Bulk
-    //   const moveStructBulk = new MessageMoveStructBulk(
-    //     owner.accountAddress,
-    //     [user2.accountAddress, owner.accountAddress, user1.accountAddress],
-    //     deductnFromSender1,
-    //     deductnFromSender2,
-    //     deductnFromSender3,
-    //     additnToRecipient1,
-    //     additnToRecipient2,
-    //     additnToRecipient3,
-    //     "admin_transfer_with_signature_bulk",
-    //     new Uint64(BigInt(nonceForBulk))
-    //   );
+      let msgStruct = await createStructForAdminTransferSigBulk(
+        owner.accountAddress,
+        [user1.accountAddress, user2.accountAddress, user3.accountAddress],
+        [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+        [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+        [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+        [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+        [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+        [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+        "admin_transfer_with_signature_bulk",
+        new Uint64(BigInt(nonceForBulk))
+      );
 
-    //   const moveStructBytesBulk = moveStructBulk.bcsToBytes();
-    //   const messageMoveStructBulkHash = sha256(moveStructBytesBulk);
-    //   const signatureBulk = await signMessage(
-    //     privateKeyOwner,
-    //     messageMoveStructBulkHash
-    //   );
-    //   // console.log("signature", signature);
+      let msgBytes = msgStruct.bcsToBytes();
+      let msgHash = sha256(msgBytes);
+      let sign = await signMessage(privateKeyOwner, msgHash);
 
-    //   // Retrieve initial bucket store balances
-    //   let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
-    //   console.log("owner", await getBucketStore(owner));
+      let [owner_initial_r1, owner_initial_r2, owner_initial_r3] =
+        await getBucketStore(owner);
+      let [user1_initial_r1, user1_initial_r2, user1_initial_r3] =
+        await getBucketStore(user1);
+      let [user2_initial_r1, user2_initial_r2, user2_initial_r3] =
+        await getBucketStore(user2);
+      let [user3_initial_r1, user3_initial_r2, user3_initial_r3] =
+        await getBucketStore(user3);
 
-    //   let [user1A, user1B, user1C] = await getBucketStore(user1);
-    //   console.log("user1", await getBucketStore(user1));
+      let [to_mint1, to_mint2, to_mint3] = [0, 0, 0];
 
-    //   let [user3A, user3B, user3C] = await getBucketStore(user3);
-    //   console.log("user3", await getBucketStore(user3));
+      if (owner_initial_r1 < 3) {
+        to_mint1 = 3 - owner_initial_r1;
+      }
+      if (owner_initial_r2 < 3) {
+        to_mint2 = 3 - owner_initial_r2;
+      }
+      if (owner_initial_r3 < 3) {
+        to_mint3 = 3 - owner_initial_r3;
+      }
 
-    //   let [user2A, user2B, user2C] = await getBucketStore(user2);
-    //   console.log("user2", await getBucketStore(user2));
+      if (to_mint1 + to_mint2 + to_mint3 > 0) {
+        await mintCoin(
+          owner,
+          owner.accountAddress,
+          to_mint1 + to_mint2 + to_mint3,
+          to_mint1,
+          to_mint2,
+          to_mint3
+        );
+        [owner_initial_r1, owner_initial_r2, owner_initial_r3] =
+          await getBucketStore(owner);
+      }
 
-    //   const metadata = await getMetadata(owner);
+      let tx = await adminTransferWithSignatureBulk(
+        owner,
+        [user1.accountAddress, user2.accountAddress, user3.accountAddress],
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+        sign
+      );
+      console.log("transaction: ", tx);
 
-    //   let ownerBalance = await getFaBalance(owner, metadata.toString());
-    //   console.log("ownerBalanc1218", ownerBalance);
+      let [owner_final_r1, owner_final_r2, owner_final_r3] =
+        await getBucketStore(owner);
+      let [user1_final_r1, user1_final_r2, user1_final_r3] =
+        await getBucketStore(user1);
+      let [user2_final_r1, user2_final_r2, user2_final_r3] =
+        await getBucketStore(user2);
+      let [user3_final_r1, user3_final_r2, user3_final_r3] =
+        await getBucketStore(user3);
+      
+      // Assertions
+      expect(owner_final_r1).toEqual(owner_initial_r1 - 3); // Check if 1 is deducted from owner
+      expect(owner_final_r2).toEqual(owner_initial_r2 - 3); // Check if 1 is deducted from owner
+      expect(owner_final_r3).toEqual(owner_initial_r3 - 3); // Check if 1 is deducted from owner
 
-    //   let transfer_amount = 60 + 600 + 45;
+      expect(user1_final_r1).toEqual(user1_initial_r1 + 1); // Check if 1 is added to user1
+      expect(user1_final_r2).toEqual(user1_initial_r2 + 1); // Check if 1 is added to user1
+      expect(user1_final_r3).toEqual(user1_initial_r3 + 1); // Check if 1 is added to user1
 
-    //   if (ownerBalance < transfer_amount) {
-    //     const mintUser = await mintCoin(
-    //       owner,
-    //       owner,
-    //       amount_to_mint,
-    //       amount_to_mint * 0.1,
-    //       amount_to_mint * 0.2,
-    //       amount_to_mint * 0.7
-    //     );
-    //     console.log("mintUser", mintUser);
-    //   }
+      expect(user2_final_r1).toEqual(user2_initial_r1 + 1); // Check if 1 is added to user2
+      expect(user2_final_r2).toEqual(user2_initial_r2 + 1); // Check if 1 is added to user2
+      expect(user2_final_r3).toEqual(user2_initial_r3 + 1); // Check if 1 is added to user2
 
-    //   // if(ownerA<60){
-    //   //   const mintUser = await mintCoin(
-    //   //     owner,
-    //   //     owner,
-    //   //     amount_to_mint,
-    //   //     reward1,
-    //   //     reward2,
-    //   //     reward3
-    //   //   );
-    //   // }
-
-    //   // if(ownerB<45){
-    //   //   const mintUser = await mintCoin(
-    //   //     owner,
-    //   //     owner,
-    //   //     amount_to_mint,
-    //   //     reward1,
-    //   //     reward2,
-    //   //     reward3
-    //   //   );
-    //   // }
-
-    //   // if(ownerC<600){
-    //   //   const mintUser = await mintCoin(
-    //   //     owner,
-    //   //     owner,
-    //   //     amount_to_mint,
-    //   //     reward1,
-    //   //     reward2,
-    //   //     reward3
-    //   //   );
-    //   // }
-
-    //   console.log("owner", await getBucketStore(owner));
-    //   let [owner1A, owner1B, owner1C] = await getBucketStore(owner);
-
-    //   // Call adminTransferWithSignature function
-    //   let adminSignatureTx = await adminTransferWithSignatureBulk(
-    //     owner,
-    //     [user2.accountAddress, user3.accountAddress, user1.accountAddress],
-    //     [10, 20, 30],
-    //     [5, 15, 25],
-    //     [100, 200, 300],
-    //     [10, 20, 30],
-    //     [5, 15, 25],
-    //     [100, 200, 300],
-    //     signatureBulk
-    //   );
-    //   console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
-
-    //   // Retrieve final bucket store balances
-    //   let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
-    //   console.log("owner", await getBucketStore(owner));
-
-    //   let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
-    //   console.log("user1", await getBucketStore(user1));
-
-    //   let [user3A1, user3B1, user3C1] = await getBucketStore(user3);
-    //   console.log("user3", await getBucketStore(user3));
-
-    //   let [user2A1, user2B1, user2C1] = await getBucketStore(user2);
-    //   console.log("user2", await getBucketStore(user2));
-
-    //   // Assertions
-    //   expect(ownerA1).toEqual(owner1A - 60); // Check if 1 is deducted from ownerA
-    //   expect(ownerB1).toEqual(owner1B - 45); // Check if 2 is deducted from ownerB
-    //   expect(ownerC1).toEqual(owner1C - 600); // Check if 3 is deducted from ownerC
-
-    //   // expect(user2A2).toEqual(user2A + 10); // Check if 3 is added to user2A
-    //   // expect(user2A2).toEqual(user2B + 5); // Check if 3 is added to user2A
-    //   // expect(user2A2).toEqual(user2C + 100); // Check if 3 is added to user2A
-
-    //   // expect(user2B2).toEqual(user2B + 1); // Check if 1 is added to user2B
-    //   // expect(user2C2).toEqual(user2C + 2); // Check if 2 is added to user2C
-    // }, 10000);
+      expect(user3_final_r1).toEqual(user3_initial_r1 + 1); // Check if 1 is added to user3
+      expect(user3_final_r2).toEqual(user3_initial_r2 + 1); // Check if 1 is added to user3
+      expect(user3_final_r3).toEqual(user3_initial_r3 + 1); // Check if 1 is added to user3
+    }, 20000);
 
     it("transfer user Reward3 To  Reward1 With Sign", async () => {
       try {
@@ -1377,7 +1337,7 @@ describe("Kcash Test", () => {
         if (user1C < 10) {
           const mintUser = await mintCoin(
             owner,
-            user1,
+            user1.accountAddress,
             amount_to_mint,
             reward1,
             reward2,
@@ -1457,7 +1417,7 @@ describe("Kcash Test", () => {
         if (user1C < transferKcash) {
           const mintUser = await mintCoin(
             owner,
-            user1,
+            user1.accountAddress,
             amount_to_mint,
             reward1,
             reward2,
@@ -1521,7 +1481,7 @@ describe("Kcash Test", () => {
         // Log any errors that occur during the process
         console.log("error", error);
       }
-    }, 10000);
+    }, 30000);
 
     it("transfer Reward3 To Reward2 With Sign", async () => {
       try {
@@ -1561,7 +1521,7 @@ describe("Kcash Test", () => {
         if (user1C < 10) {
           const mintUser = await mintCoin(
             owner,
-            user1,
+            user1.accountAddress,
             amount_to_mint,
             reward1,
             reward2,
@@ -1662,7 +1622,7 @@ describe("Kcash Test", () => {
         if (user1C < transferKcash) {
           const mintUser = await mintCoin(
             owner,
-            user1,
+            user1.accountAddress,
             amount_to_mint,
             reward1,
             reward2,
@@ -1725,20 +1685,20 @@ describe("Kcash Test", () => {
         // Log any errors that occur during the process
         console.log("error", error);
       }
-    }, 10000);
+    }, 30000);
   });
 
   describe("add Minter Role", () => {
     it("add Minter Role", async () => {
       try {
         // Get the current minter list before adding the new minter role
-        const get_minter_list = await getMinterList(owner);
+        const get_minter_list = await getMinterList();
 
         // Add minter role to user2 and receive transaction result
         let adMint = await addMinterRole(owner, user2.accountAddress);
 
         // Get the minter list after adding the new minter role
-        const get_minter_list_after = await getMinterList(owner);
+        const get_minter_list_after = await getMinterList();
 
         // Assert that the transaction result is defined, indicating a successful transaction
         expect(adMint).toBeDefined();

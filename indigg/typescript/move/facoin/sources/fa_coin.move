@@ -171,7 +171,7 @@ module FACoin::fa_coin {
             Stores the global storage for the addresses of  signer role
         */
         let s_vec = vector::empty<vector<u8>>();
-        vector::push_back<vector<u8>>(&mut s_vec, x"cc5641c4ff082ab4ccd9201bf82bbcfa6aedb258f32bd2c0c42d58b23fa8773e");
+        vector::push_back<vector<u8>>(&mut s_vec, x"1d141a53581ed61921cf218d0c4ff1192851620b5582adb1226bcfb65f378da6");
         move_to(admin, AdminSigner{signer_vec: s_vec});
 
         /*
@@ -347,8 +347,12 @@ module FACoin::fa_coin {
 
     // Admin Transfers with Signature
     public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductnFromSender: vector<u64>, additnToRecipient: vector<u64>, signature: vector<u8>)
-    acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce, AdminSigner {
+    acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce, AdminSigner, AdminTransferRole {
+        assert!(verifyAdminTransfer(signer::address_of(admin)), error::invalid_argument(EINVALID_ROLE));
         let nonce = get_nonce(signer::address_of(admin));
+        if (nonce == 0 && !exists<ManagedNonce>(signer::address_of(admin))){
+            move_to(admin, ManagedNonce{ nonce })
+        };
         let message = AdminTransferSignature{
             from: signer::address_of(admin),
             to,
@@ -366,7 +370,6 @@ module FACoin::fa_coin {
 
         // event::emit<MessageHash>(MessageHash{message, messag_bytes, message_hash, is_signature_valid});
         event::emit<AdminTransferWithSignatureEvent>(AdminTransferWithSignatureEvent{message, is_signature_valid});
-        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
         assert!(vector::length(&deductnFromSender) == vector::length(&additnToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
         let (r1, r2, r3) = (*vector::borrow(&deductnFromSender, 0), *vector::borrow(&deductnFromSender, 1), *vector::borrow(&deductnFromSender, 2));
         withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
@@ -396,12 +399,14 @@ module FACoin::fa_coin {
     }
 
     // Admin Transfers with Signature Bulk
-      public entry fun admin_transfer_with_signature_bulk(admin: &signer, to_vec: vector<address>, deductnFromSender1: vector<u64>, deductnFromSender2: vector<u64>, deductnFromSender3: vector<u64>, additnToRecipient1: vector<u64>, additnToRecipient2: vector<u64>, additnToRecipient3: vector<u64>, signature: vector<u8>)
-        acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce, AdminSigner {
-        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+    public entry fun admin_transfer_with_signature_bulk(admin: &signer, to_vec: vector<address>, deductnFromSender1: vector<u64>, deductnFromSender2: vector<u64>, deductnFromSender3: vector<u64>, additnToRecipient1: vector<u64>, additnToRecipient2: vector<u64>, additnToRecipient3: vector<u64>, signature: vector<u8>)
+        acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce, AdminSigner, AdminTransferRole {
+        assert!(verifyAdminTransfer(signer::address_of(admin)), error::invalid_argument(EINVALID_ROLE));
 
         let nonce = get_nonce(signer::address_of(admin));
-
+         if (nonce == 0 && !exists<ManagedNonce>(signer::address_of(admin)) ){
+            move_to(admin, ManagedNonce{ nonce })
+        };
         let message1 = AdminTransferSignatureBulk{
             from: signer::address_of(admin),
             to: to_vec,
@@ -981,7 +986,7 @@ module FACoin::fa_coin {
     public entry fun transfer_reward3_to_reward1(from: &signer, to: address, amount: u64, signature: vector<u8>) 
     acquires ManagedFungibleAsset, BucketCore, BucketStore, ManagedNonce, AdminSigner{
         let nonce = get_nonce(signer::address_of(from));
-        if (nonce == 0 ){
+        if (nonce == 0 && !exists<ManagedNonce>(signer::address_of(from)) ){
             move_to(from, ManagedNonce{ nonce })
         };
         let message = UserTransferWithSign{
@@ -1016,7 +1021,7 @@ module FACoin::fa_coin {
         assert!(len == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
 
         let nonce = get_nonce(signer::address_of(from));
-        if (nonce == 0 ){
+        if (nonce == 0 && !exists<ManagedNonce>(signer::address_of(from)) ){
             move_to(from, ManagedNonce{ nonce })
         };
         // creating a struct for bulk transfer
@@ -1053,7 +1058,7 @@ module FACoin::fa_coin {
     public entry fun transfer_reward3_to_reward2(from: &signer, to: address, amount: u64, signature: vector<u8>) 
     acquires ManagedFungibleAsset, BucketCore, BucketStore, ManagedNonce, AdminSigner{
         let nonce = get_nonce(signer::address_of(from));
-        if (nonce == 0 ){
+        if (nonce == 0 && !exists<ManagedNonce>(signer::address_of(from))){
             move_to(from, ManagedNonce{ nonce })
         };
         let message = UserTransferWithSign{
@@ -1087,7 +1092,7 @@ module FACoin::fa_coin {
         assert!(len == vector::length(&amount_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
 
         let nonce = get_nonce(signer::address_of(from));
-        if (nonce == 0 ){
+        if (nonce == 0 && !exists<ManagedNonce>(signer::address_of(from))){
             move_to(from, ManagedNonce{ nonce })
         };
         // creating a struct for bulk transfer

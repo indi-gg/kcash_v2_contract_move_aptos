@@ -28,12 +28,36 @@ To deploy or publish your token, follow these steps:
 
 1. Navigate to the TypeScript directory:
    ```bash
-   cd typescript
+   cd indigg/typescript
    ```
 2. Run script file:
     ```bash
     pnpm run kcash_fungible_asset
     ```
+
+## Update Network 
+
+1. Open the tsup.config.ts file and find the line:
+    ```bash
+    APTOS_NETWORK: process.env.APTOS_NETWORK ?? "Devnet",
+    ```
+    And update Devnet with Testnet or Mainnet.
+    ```bash
+    APTOS_NETWORK: process.env.APTOS_NETWORK ?? "Testnet",
+    ```
+
+2. Also Update in Typescript file.
+    ```bash
+    // Setup the client
+    const APTOS_NETWORK: Network = NetworkToNetworkName[Network.DEVNET];
+    ```
+    And update Devnet with Testnet or Mainnet.
+    ```bash
+    // Setup the client
+    const APTOS_NETWORK: Network = NetworkToNetworkName[Network.TESTNET];
+    ```
+
+
 
 #### Customized Logic
 To enhance user engagement and participation, we have implemented a customized reward distribution system based on three distinct buckets:

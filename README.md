@@ -66,8 +66,29 @@ To deploy or publish your token, follow these steps:
 ## Creating Keys 
 
 To generate keys including public key, private key, and address for all users including admins, run the following command:
+
+```bash
+cd indigg/typescript
+```
+
 ```bash
 pnpm run createKeys
+```
+
+After creating keys, also need to update the signer's public key On-Chain, which is in fa_coin.move file.
+
+For this, you need to navigate by using below command.
+
+```bash
+cd indigg/typescript/move/facoin/sources
+```
+
+Open the fa_coin.move file and search for init_module function and in that, look for below line:
+
+Update your public key here excluding 0x
+
+```bash
+vector::push_back<vector<u8>>(&mut s_vec, x"cc5641c4ff082ab4ccd9201bf82bbcfa6aedb258f32bd2c0c42d58b23fa8773e");
 ```
 
 ## Testing 
@@ -105,7 +126,18 @@ pnpm jest
     const APTOS_NETWORK: Network = NetworkToNetworkName[Network.TESTNET];
     ```
 
+## Compiling the code
 
+1. Navigate to the facoin folder using following command.
+
+    ```bash
+    cd indigg/typescript/move/facoin
+    ```
+2. Now run the command, here you can use any address of user.
+
+    ```bash
+    aptos move compile --named-addresses  FACoin="0xb8c6e21fe1c09b0891703c75abe828a7867286f312743011b53d883fa621379c"
+    ```
 
 #### Customized Logic
 To enhance user engagement and participation, we have implemented a customized reward distribution system based on three distinct buckets:

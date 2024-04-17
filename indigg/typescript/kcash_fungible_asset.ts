@@ -165,7 +165,7 @@ export const deductionFromSender = [
   new Uint64(BigInt(30)),
 ];
 
-const additionToRecipient = [
+export const additionToRecipient = [
   new Uint64(BigInt(10)),
   new Uint64(BigInt(20)),
   new Uint64(BigInt(30)),
@@ -1256,37 +1256,37 @@ async function main() {
   console.log(`User1: ${user1.accountAddress.toString()}`);
   console.log(`User2: ${user2.accountAddress.toString()}`);
 
-  // let deployedTx = await compileAndDeploy();
-  // console.log("🚀 ~ main ~ deployedTx:", deployedTx);
+  let deployedTx = await compileAndDeploy();
+  console.log("🚀 ~ main ~ deployedTx:", deployedTx);
 
-  const metadata = await getMetadata(owner);
-  let metadataAddress = metadata.toString();
-  console.log("metadata address:", metadataAddress);
+  // const metadata = await getMetadata(owner);
+  // let metadataAddress = metadata.toString();
+  // console.log("metadata address:", metadataAddress);
 
-  console.log("Nonce: ", await getNonce(user2));
+  // console.log("Nonce: ", await getNonce(user2));
 
   //List of minter
-  console.log("Updated minters list: ", await getMinterList(owner));
-  console.log("Updated minters list: ", await getAdminTransferList(owner));
+  // console.log("Updated minters list: ", await getMinterList(owner));
+  // console.log("Updated minters list: ", await getAdminTransferList(owner));
 
-  console.log(
-    "\n All the balances in this exmaple refer to balance in primary fungible stores of each account."
-  );
-  console.log(
-    `Owner's initial KCash balance: ${await getFaBalance(
-      owner,
-      metadataAddress
-    )}.`
-  );
-  console.log(
-    `User1's initial balance: ${await getFaBalance(user1, metadataAddress)}.`
-  );
-  console.log(
-    `User2's initial balance: ${await getFaBalance(user2, metadataAddress)}.`
-  );
+  // console.log(
+  //   "\n All the balances in this exmaple refer to balance in primary fungible stores of each account."
+  // );
+  // console.log(
+  //   `Owner's initial KCash balance: ${await getFaBalance(
+  //     owner,
+  //     metadataAddress
+  //   )}.`
+  // );
+  // console.log(
+  //   `User1's initial balance: ${await getFaBalance(user1, metadataAddress)}.`
+  // );
+  // console.log(
+  //   `User2's initial balance: ${await getFaBalance(user2, metadataAddress)}.`
+  // );
 
-  console.log("\nOwner mints 1000 kcash in self account");
-  let owner_mint = 1000 * decimal_kcash;
+  // console.log("\nOwner mints 1000 kcash in self account");
+  // let owner_mint = 1000 * decimal_kcash;
   // let mTx = await mintCoin(
   //   owner,
   //   user1,
@@ -1296,28 +1296,28 @@ async function main() {
   //   owner_mint * 0.7
   // );
   // console.log("🚀 ~ mTx:", mTx);
-  console.log(
-    `User's KCash balance after mint: ${await getFaBalance(
-      user1,
-      metadataAddress
-    )}.`
-  );
-  console.log("User1 bucket store :", await getBucketStore(user1));
-  console.log("User2 bucket store :", await getBucketStore(user2));
+  // console.log(
+  //   `User's KCash balance after mint: ${await getFaBalance(
+  //     user1,
+  //     metadataAddress
+  //   )}.`
+  // );
+  // console.log("User1 bucket store :", await getBucketStore(user1));
+  // console.log("User2 bucket store :", await getBucketStore(user2));
 
   // transferReward3ToReward1WithSign
-  let nonce = await getNonce(user1);
-  console.log("🚀 ~ nonce:", nonce);
-  let message = await createStructForMsg(
-    user1.accountAddress,
-    user2.accountAddress,
-    new Uint64(BigInt(1)),
-    "transfer_reward3_to_reward1",
-    new Uint64(BigInt(nonce))
-  );
+  // let nonce = await getNonce(user1);
+  // console.log("🚀 ~ nonce:", nonce);
+  // let message = await createStructForMsg(
+  //   user1.accountAddress,
+  //   user2.accountAddress,
+  //   new Uint64(BigInt(1)),
+  //   "transfer_reward3_to_reward1",
+  //   new Uint64(BigInt(nonce))
+  // );
 
-  let messageBytes = message.bcsToBytes();
-  let messageHash = sha256(messageBytes);
+  // let messageBytes = message.bcsToBytes();
+  // let messageHash = sha256(messageBytes);
   // let sign = await signMessage(signer_pk, messageHash);
 
   // const tx = await transferReward3ToReward1WithSign(
@@ -1333,19 +1333,19 @@ async function main() {
   // console.log("🚀 ~ adTransfer:", adTransfer);
   // console.log("Updated minters list: ", await getAdminTransferList(owner));
 
-  let addsigner = await addSigner(owner, owner.publicKey.toUint8Array());
-  console.log("🚀 ~ addsigner:", addsigner);
+  // let addsigner = await addSigner(owner, owner.publicKey.toUint8Array());
+  // console.log("🚀 ~ addsigner:", addsigner);
 
-  let sign = await signMessage(privateKeyOwner, messageHash);
+  // let sign = await signMessage(privateKeyOwner, messageHash);
 
-  const tx2 = await transferReward3ToReward1WithSign(
-    user1,
-    user2.accountAddress,
-    1,
-    sign
-  );
-  console.log("🚀 ~ tx:", tx2);
-  console.log("User2 bucket store :", await getBucketStore(user2));
+  // const tx2 = await transferReward3ToReward1WithSign(
+  //   user1,
+  //   user2.accountAddress,
+  //   1,
+  //   sign
+  // );
+  // console.log("🚀 ~ tx:", tx2);
+  // console.log("User2 bucket store :", await getBucketStore(user2));
 
   // // Assign minter role to user1
   // let adMint = await addMinterRole(owner, user1.accountAddress);
@@ -2131,7 +2131,7 @@ async function main() {
   // console.log("SignatureBulk: ", signatureBulk.toString());
   // console.log("=============================================");
 
-  // // Admin Transfer with Signature
+  // Admin Transfer with Signature
   // let adminSignatureTx = await adminTransferWithSignature(
   //   owner,
   //   user2.accountAddress,
@@ -2143,24 +2143,24 @@ async function main() {
   // );
   // console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
 
-  /*
+  
   // =======
-  let adminSignatureTxBulk = await adminTransferWithSignatureBulk(
-    owner,
-    [user2.accountAddress, owner.accountAddress, user1.accountAddress],
-    [10, 20, 30],
-    [5, 15, 25],
-    [100, 200, 300],
-    [10, 20, 30],
-    [5, 15, 25],
-    [100, 200, 300],
-    signatureBulk,
-    "admin_transfer_with_signature_bulk",
-    20
-  );
-  console.log("adminSignatureTxBulk", adminSignatureTxBulk);
-*/
-  console.log("done.");
+  // let adminSignatureTxBulk = await adminTransferWithSignatureBulk(
+  //   owner,
+  //   [user2.accountAddress, owner.accountAddress, user1.accountAddress],
+  //   [10, 20, 30],
+  //   [5, 15, 25],
+  //   [100, 200, 300],
+  //   [10, 20, 30],
+  //   [5, 15, 25],
+  //   [100, 200, 300],
+  //   signatureBulk,
+  //   "admin_transfer_with_signature_bulk",
+  //   20
+  // );
+  // console.log("adminSignatureTxBulk", adminSignatureTxBulk);
+
+  // console.log("done.");
 }
 
 main();

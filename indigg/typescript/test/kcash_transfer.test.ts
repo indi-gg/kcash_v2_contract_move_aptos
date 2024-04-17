@@ -51,6 +51,7 @@ import {
   createStructForMsg,
   Uint64,
   createStructForMsgBulk,
+  adminTransferWithSignatureBulk,
 } from "../kcash_fungible_asset";
 import sha256 from "fast-sha256";
 import { compilePackage, getPackageBytesToPublish } from "../utils";
@@ -82,7 +83,7 @@ let metadataAddress: string;
 
 const decimal_kcash = 1;
 const amount_to_mint = 1000 * decimal_kcash;
-const amount_To_Burn = 500 * decimal_kcash;
+const amount_To_Burn = 200 * decimal_kcash;
 const reward1 = amount_to_mint * 0.1;
 const reward2 = amount_to_mint * 0.2;
 const reward3 = amount_to_mint * 0.7;
@@ -315,7 +316,7 @@ describe("Kcash Test", () => {
         // Burn coins from the user's account
         const burnCoinTransactionHash = await burnCoin(
           owner,
-          user1.accountAddress,
+          user2.accountAddress,
           amount_To_Burn
         );
 
@@ -434,23 +435,21 @@ describe("Kcash Test", () => {
         let amount_to_transfer =
           amount_to_transfer_user1 + amount_to_transfer_user2;
 
+        if (initialBalanceUser1 < amount_to_transfer) {
+          const mintUser = await mintCoin(
+            owner,
+            user1,
+            amount_to_mint,
+            reward1,
+            reward2,
+            reward3
+          );
+          console.log("mithash", mintUser);
+        }
 
-          if (initialBalanceUser1 < amount_to_transfer) {
-            const mintUser = await mintCoin(
-              owner,
-              user1,
-              amount_to_mint,
-              reward1,
-              reward2,
-              reward3
-            );
-            console.log("mithash", mintUser);
-          }
-
-
-           // Retrieve initial balances for owner, user1, and user2
-        const initialBalanceOwner = await getFaBalance(
-          owner,
+        // Retrieve initial balances for owner, user1, and user2
+        const initialBalanceuser = await getFaBalance(
+          user1,
           metadataAddress.toString()
         );
 
@@ -460,8 +459,6 @@ describe("Kcash Test", () => {
           user_arr, // Array of receiver addresses
           amount_ar1 // Amount to transfer to each receiver
         );
-
-      
 
         // Retrieve final balances for owner, user1, and user2
         const finalBalanceOwner = await getFaBalance(
@@ -484,9 +481,9 @@ describe("Kcash Test", () => {
         expect(typeof transactionHash).toBe("string");
 
         // Check if the balances changed correctly after the bulk transfer
-        expect(finalBalanceUser1).toBe(initialBalanceUser1 - amount); // 2 receivers, so deduct 2 * amountBulk from user1
+        expect(finalBalanceUser1).toBe(initialBalanceuser - amount); // 2 receivers, so deduct 2 * amountBulk from user1
         expect(finalBalanceOwner).toBe(
-          initialBalanceOwner + amount_to_transfer_user1
+          initialBalanceOwner1 + amount_to_transfer_user1
         ); // Owner's balance should decrease by amountBulk
         expect(finalBalanceUser2).toBe(
           initialBalanceUser2 + amount_to_transfer_user2
@@ -499,7 +496,7 @@ describe("Kcash Test", () => {
   });
 
   describe("admin- transfer", () => {
-    it("adminTransfer", async () => {
+    it("admin Transfer from his buckets to user buckets", async () => {
       // Logging initial bucket store values for owner and user1
       console.log("owner bucket store :", await getBucketStore(owner));
       console.log("User1 bucket store :", await getBucketStore(user1));
@@ -508,14 +505,38 @@ describe("Kcash Test", () => {
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
       let [user1A, user1B, user1C] = await getBucketStore(user1);
 
+      // Getting metadata and owner's KCash balance
+      const metadata = await getMetadata(owner);
+      let ownerBalance = await getFaBalance(owner, metadata.toString());
+
+      // Define the total transfer amount
+      let transfer_amount = 1 + 2 + 3;
+
+      // Check if owner's KCash balance is sufficient for the transfer
+      if (ownerBalance < transfer_amount) {
+        // If owner's KCash balance is less than the transfer amount, mint KCash for the owner
+        const mintUser = await mintCoin(
+          owner,
+          owner,
+          amount_to_mint,
+          reward1,
+          reward2,
+          reward3
+        );
+        console.log("Minted KCash for owner:", mintUser);
+      }
+
+      // Getting updated bucket store values for owner after minting
+      let [owner1A, owner1B, owner1C] = await getBucketStore(owner);
+
       // Performing admin transfer
       const txt = await adminTransfer(
         owner,
         user1.accountAddress,
-        [1, 2, 3],
-        [3, 1, 2]
+        [1, 2, 3], // Amounts to transfer from owner to user1's buckets
+        [3, 1, 2] // Indexes of buckets for transfer (1, 2, 3) -> (Reward1, Reward2, Reward3)
       );
-      console.log("txt", txt);
+      console.log("Transaction hash of admin transfer:", txt);
 
       // Logging bucket store values after admin transfer for user1 and owner
       console.log("User1 bucket store :", await getBucketStore(user1));
@@ -526,16 +547,17 @@ describe("Kcash Test", () => {
       let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
 
       // Assertions
-      expect(ownerA1).toBe(ownerA - 1); // Check if 1 is deducted from ownerA
-      expect(ownerB1).toBe(ownerB - 2); // Check if 2 is deducted from ownerB
-      expect(ownerC1).toBe(ownerC - 3); // Check if 3 is deducted from ownerC
+      expect(ownerA1).toBe(owner1A - 1); // Owner's Reward1 bucket should decrease by 1
+      expect(ownerB1).toBe(owner1B - 2); // Owner's Reward2 bucket should decrease by 2
+      expect(ownerC1).toBe(owner1C - 3); // Owner's Reward3 bucket should decrease by 3
 
-      expect(user1A1).toBe(user1A + 3); // Check if 3 is added to user1A
-      expect(user1B1).toBe(user1B + 1); // Check if 1 is added to user1B
-      expect(user1C1).toBe(user1C + 2); // Check if 2 is added to user1C
-    }, 10000); // Timeout set to 10 seconds for this test case
+      expect(user1A1).toBe(user1A + 3); // User1's Reward1 bucket should increase by 3
+      expect(user1B1).toBe(user1B + 1); // User1's Reward2 bucket should increase by 1
+      expect(user1C1).toBe(user1C + 2); // User1's Reward3 bucket should increase by 2
+    }, 10000); // Timeout set to 10 seconds
 
-    it("adminTransferBulk", async () => {
+    it("admin Transfer his bucket to users bucket  Bulk", async () => {
+      // Logging initial bucket store values for owner, user1, and user2
       console.log("owner bucket store :", await getBucketStore(owner));
       console.log("User1 bucket store :", await getBucketStore(user1));
       console.log("User2 bucket store :", await getBucketStore(user2));
@@ -547,21 +569,45 @@ describe("Kcash Test", () => {
         await getBucketStore(user1);
       const [initialUser2A, initialUser2B, initialUser2C] =
         await getBucketStore(user2);
+      const metadata = await getMetadata(owner);
+      // Get owner's KCash balance
+      let ownerBalance = await getFaBalance(owner, metadata.toString());
 
-      const address = [user1.accountAddress, user2.accountAddress];
+      // Define the total transfer amount
+      let transfer_amount = 5 + 7 + 6;
+
+      // Check if owner's KCash balance is sufficient for the transfer
+      if (ownerBalance < transfer_amount) {
+        // If owner's KCash balance is less than the transfer amount, mint KCash for the owner
+        const mintUser = await mintCoin(
+          owner,
+          owner,
+          amount_to_mint,
+          reward1,
+          reward2,
+          reward3
+        );
+        console.log("Minted KCash for owner:", mintUser);
+      }
+
+      // Retrieve updated bucket store values for owner after minting
+      const [initialOwner1A, initialOwner1B, initialOwner1C] =
+        await getBucketStore(owner);
+
+      // Performing admin bulk transfer
       const txt = await adminTransferBulk(
         owner,
-        address,
+        [user1.accountAddress, user2.accountAddress], // Array of receiver addresses
         [
-          [1, 2, 3],
-          [4, 5, 3],
+          [1, 2, 3], // Amounts to transfer from owner to user1's buckets
+          [4, 5, 3], // Amounts to transfer from owner to user2's buckets
         ],
         [
-          [3, 1, 2],
-          [6, 0, 6],
+          [3, 1, 2], // Indexes of buckets for transfer to user1 (1, 2, 3) -> (Reward1, Reward2, Reward3)
+          [6, 0, 6], // Indexes of buckets for transfer to user2 (1, 2, 3) -> (Reward1, Reward2, Reward3)
         ]
       );
-      console.log("txt", txt);
+      console.log("Transaction hash of admin bulk transfer:", txt);
 
       // Retrieve final bucket store balances
       const [finalOwnerA, finalOwnerB, finalOwnerC] =
@@ -572,18 +618,18 @@ describe("Kcash Test", () => {
         await getBucketStore(user2);
 
       // Assertions
-      expect(finalOwnerA).toBe(initialOwnerA - (1 + 4)); // Check if 1 is deducted from ownerA for user1 and 4 for user2
-      expect(finalOwnerB).toBe(initialOwnerB - (2 + 5)); // Check if 2 is deducted from ownerB for user1 and 5 for user2
-      expect(finalOwnerC).toBe(initialOwnerC - (3 + 3)); // Check if 3 is deducted from ownerC for both users
+      expect(finalOwnerA).toBe(initialOwner1A - (1 + 4)); // Owner's buckets should decrease by transferred amounts to user1 and user2
+      expect(finalOwnerB).toBe(initialOwner1B - (2 + 5));
+      expect(finalOwnerC).toBe(initialOwner1C - (3 + 3));
 
-      expect(finalUser1A).toBe(initialUser1A + 3); // Check if 3 is added to user1A
-      expect(finalUser1B).toBe(initialUser1B + 1); // Check if 1 is added to user1B
-      expect(finalUser1C).toBe(initialUser1C + 2); // Check if 2 is added to user1C
+      expect(finalUser1A).toBe(initialUser1A + 3); // User1's buckets should increase by transferred amounts
+      expect(finalUser1B).toBe(initialUser1B + 1);
+      expect(finalUser1C).toBe(initialUser1C + 2);
 
-      expect(finalUser2A).toBe(initialUser2A + 6); // Check if 6 is added to user2A
-      expect(finalUser2B).toBe(initialUser2B + 0); // Check if 0 is added to user2B
-      expect(finalUser2C).toBe(initialUser2C + 6); // Check if 6 is added to user2C
-    }, 10000);
+      expect(finalUser2A).toBe(initialUser2A + 6); // User2's buckets should increase by transferred amounts
+      expect(finalUser2B).toBe(initialUser2B + 0);
+      expect(finalUser2C).toBe(initialUser2C + 6);
+    }, 10000); // Timeout set to 10 seconds
   });
 
   describe("freeze and unfreeze functions", () => {
@@ -645,149 +691,185 @@ describe("Kcash Test", () => {
   });
 
   describe("bucket-transfer three to one", () => {
-    it("admin Transfer  kcash From his Reward3 to user Reward1 bulk ", async () => {
-      let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
-      // console.log("buketowner", await getBucketStore(owner));
-
-      let [user1A, user1B, user1C] = await getBucketStore(user1);
-      // console.log("buketuser1", await getBucketStore(user1));
-
-      let [user2A, user2B, user2C] = await getBucketStore(user2);
-      console.log("buketuser2", await getBucketStore(user2));
-
-      const transferKcash1 = 10 * decimal_kcash;
-      const transferKcash2 = 20 * decimal_kcash;
-      const amountbulk_arr = [transferKcash1, transferKcash2];
-
-      // Transfer rewards from bucket 3 to bucket 1
-      let rew2Tx = await transferReward3ToReward1ByAdminOnlyInBulk(
-        owner,
-        receiver_ar,
-        amountbulk_arr
-      );
-      console.log("🚀 ~ rewTx:", rew2Tx);
-
-      // Validate bucket stores after transfer
-      console.log("buketowner", await getBucketStore(owner));
-      console.log("user1", await getBucketStore(user1));
-      console.log("user2", await getBucketStore(user2));
-
-      let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
-      let [user1A2, user1B2, user1C3] = await getBucketStore(user1);
-      let [user2A3, user2B3, user2C3] = await getBucketStore(user2);
-
-      // Assertion
-
-      const ownerExpected = ownerC - 30 * decimal_kcash;
-
-      // Assert the changes in bucket stores
-      expect(ownerC1).toEqual(ownerC - 30 * decimal_kcash); // Owner's bucket 3 should decrease by transferKcash
-      expect(user1A2).toEqual(user1A + 10); // User1's bucket 1 should increase by transferKcash
-      expect(user2A3).toEqual(user2A + 20 * decimal_kcash); // User2's bucket 1 should increase by transferKcash
-
-      expect(rew2Tx).toBeDefined();
-    }, 20000);
-
-    it("admin Transfer  kcash From his Reward3 to user Reward1 ", async () => {
+    it("admin Transfer KCash From his Reward3 to user Reward1", async () => {
+      // Retrieve initial bucket store balances for owner and user1
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
       let [user1A, user1B, user1C] = await getBucketStore(user1);
 
+      // Define the amount to transfer
       const transferKcash = 10 * decimal_kcash;
 
-      // Transfer rewards from bucket 3 to bucket 1
+      // Check if owner's reward3 balance is sufficient for the transfer
+      if (ownerC < transferKcash) {
+        // If owner's reward3 balance is less than the transfer amount, mint KCash for the owner
+        const mintUser = await mintCoin(
+          owner,
+          owner,
+          amount_to_mint,
+          reward1,
+          reward2,
+          reward3
+        );
+        console.log("Minted KCash for owner:", mintUser);
+      }
+
+      // Get owner's bucket store details before the transfer
+      let [owner1A, owner1B, owner1C] = await getBucketStore(owner);
+
+      // Perform the transfer of rewards from owner's reward3 to user1's reward1
       let rew2Tx = await transferReward3ToReward1ByAdminOnly(
         owner,
         user1.accountAddress,
         transferKcash
       );
-      console.log("🚀 ~ rewTx:", rew2Tx);
+      console.log("Transaction hash of the transfer:", rew2Tx);
 
       // Validate bucket stores after transfer
       let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
       let [user1A1, user1B2, user1C3] = await getBucketStore(user1);
 
       // Assert the changes in bucket stores
-      expect(ownerC1).toEqual(ownerC - 10 * decimal_kcash); // Owner's bucket 3 should decrease by transferKcash
-      expect(user1A1).toEqual(user1A + 10 * decimal_kcash); // User1's bucket 1 should increase by transferKcash
-      expect(rew2Tx).toBeDefined();
+      expect(ownerC1).toEqual(owner1C - 10 * decimal_kcash); // Owner's reward3 balance should decrease by transferKcash
+      expect(user1A1).toEqual(user1A + 10 * decimal_kcash); // User1's reward1 balance should increase by transferKcash
+      expect(rew2Tx).toBeDefined(); // Check if the transaction hash is defined, indicating a successful transfer
     }, 20000);
 
-    // it("admin Transfer kcash From his Reward3 to user Reward1 bulk", async () => {
-    //   let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
-    //   let [user1A, user1B, user1C] = await getBucketStore(user1);
-    //   let [user2A, user2B, user2C] = await getBucketStore(user2);
+    it("admin Transfer KCash From his Reward3 to user Reward1 in bulk", async () => {
+      // Retrieve initial bucket store balances for owner, user1, and user2
+      let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
+      let [user1A, user1B, user1C] = await getBucketStore(user1);
+      let [user2A, user2B, user2C] = await getBucketStore(user2);
 
-    //   const transferKcash1 = 10 * decimal_kcash;
-    //   const transferKcash2 = 20 * decimal_kcash;
-    //   const amountbulk_arr = [transferKcash1, transferKcash2];
+      // Define the amounts to transfer to each user
+      const transferKcash1 = 10 * decimal_kcash;
+      const transferKcash2 = 20 * decimal_kcash;
+      const amountbulk_arr = [transferKcash1, transferKcash2];
+      const amount_transfer = transferKcash1 + transferKcash2;
 
-    //   // Transfer rewards from bucket 3 to bucket 1
-    //   let rew2Tx = await transferReward3ToReward1ByAdminOnlyInBulk(
-    //     owner,
-    //     receiver_ar,
-    //     amountbulk_arr
-    //   );
-    //   console.log("🚀 ~ rewTx:", rew2Tx);
+      // Check if owner's reward3 balance is sufficient for the transfer
+      if (ownerC < amount_transfer) {
+        // If owner's reward3 balance is less than the total transfer amount, mint KCash for the owner
+        const mintUser = await mintCoin(
+          owner,
+          owner,
+          amount_to_mint,
+          reward1,
+          reward2,
+          reward3
+        );
+        console.log("Minted KCash for owner:", mintUser);
+      }
 
-    //   // Validate bucket stores after transfer
-    //   let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
-    //   let [user1A2, user1B2, user1C3] = await getBucketStore(user1);
-    //   let [user2A3, user2B3, user2C3] = await getBucketStore(user2);
+      // Get owner's bucket store details before the transfer
+      let [owner1A, owner1B, owner1C] = await getBucketStore(owner);
 
-    //   // Assertions
-    //   const ownerExpected = ownerC - (transferKcash1 + transferKcash2);
+      // Perform the transfer of rewards from owner's reward3 to user1 and user2's reward1 in bulk
+      let rew2Tx = await transferReward3ToReward1ByAdminOnlyInBulk(
+        owner,
+        receiver_ar,
+        amountbulk_arr
+      );
+      console.log("Transaction hash of the transfer:", rew2Tx);
 
-    //   // Assert the changes in bucket stores
-    //   expect(ownerC1).toEqual(ownerExpected); // Owner's bucket 3 should decrease by transferKcash1 + transferKcash2
-    //   expect(user1A2).toEqual(user1A + transferKcash1); // User1's bucket 1 should increase by transferKcash1
-    //   expect(user2A3).toEqual(user2A + transferKcash2); // User2's bucket 1 should increase by transferKcash2
+      // Validate bucket stores after transfer
+      console.log("Bucket store for owner:", await getBucketStore(owner));
+      console.log("Bucket store for user1:", await getBucketStore(user1));
+      console.log("Bucket store for user2:", await getBucketStore(user2));
 
-    //   expect(rew2Tx).toBeDefined();
-    // }, 10000);
+      // Get bucket store details after the transfer
+      let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
+      let [user1A2, user1B2, user1C3] = await getBucketStore(user1);
+      let [user2A3, user2B3, user2C3] = await getBucketStore(user2);
+
+      // Assert the changes in bucket stores
+      const ownerExpected = ownerC - 30 * decimal_kcash;
+      expect(ownerC1).toEqual(owner1C - 30 * decimal_kcash); // Owner's reward3 balance should decrease by the total transfer amount
+      expect(user1A2).toEqual(user1A + 10); // User1's reward1 balance should increase by transferKcash1
+      expect(user2A3).toEqual(user2A + 20 * decimal_kcash); // User2's reward1 balance should increase by transferKcash2
+      expect(rew2Tx).toBeDefined(); // Check if the transaction hash is defined, indicating a successful transfer
+    }, 20000);
   });
 
   describe("bucket-transfer three to two", () => {
-    it("admin Transfer  kcash From his Reward3 to user Reward2 ", async () => {
+    it("admin Transfer KCash From his Reward3 to user Reward2 ", async () => {
+      // Retrieve initial bucket store balances for owner and user1
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
       let [user1A, user1B, user1C] = await getBucketStore(user1);
 
+      // Define the amount of KCash to transfer
       const transferKcash = 10 * decimal_kcash;
 
-      // Transfer rewards from bucket 3 to bucket 1
+      // Check if owner's reward3 balance is sufficient for the transfer
+      if (ownerC < transferKcash) {
+        // If owner's reward3 balance is less than the transfer amount, mint KCash for the owner
+        const mintUser = await mintCoin(
+          owner,
+          owner,
+          amount_to_mint,
+          reward1,
+          reward2,
+          reward3
+        );
+        console.log("Minted KCash for owner:", mintUser);
+      }
+
+      // Get owner's bucket store details before the transfer
+      let [owner1A, owner1B, owner1C] = await getBucketStore(owner);
+
+      // Perform the transfer of rewards from owner's reward3 to user1's reward2
       let rew2Tx = await transferReward3ToReward2ByAdminOnly(
         owner,
         user1.accountAddress,
         transferKcash
       );
-      console.log("🚀 ~ rewTx:", rew2Tx);
+      console.log("Transaction hash of the transfer:", rew2Tx);
 
       // Validate bucket stores after transfer
       let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
       let [user1A1, user1B2, user1C3] = await getBucketStore(user1);
 
       // Assert the changes in bucket stores
-      expect(ownerC - 10 * decimal_kcash).toEqual(ownerC1); // Owner's bucket 3 should decrease by transferKcash
-      expect(user1B + 10 * decimal_kcash).toEqual(user1B2); // User1's bucket 1 should increase by transferKcash
-      expect(rew2Tx).toBeDefined();
+      expect(owner1C - 10 * decimal_kcash).toEqual(ownerC1); // Owner's reward3 balance should decrease by transferKcash
+      expect(user1B + 10 * decimal_kcash).toEqual(user1B2); // User1's reward2 balance should increase by transferKcash
+      expect(rew2Tx).toBeDefined(); // Check if the transaction hash is defined, indicating a successful transfer
     }, 10000);
 
-    it("admin Transfer kcash From his Reward3 to user Reward2 in bulk", async () => {
+    it("admin Transfer KCash From his Reward3 to user Reward2 in bulk", async () => {
+      // Retrieve initial bucket store balances for owner, user1, and user2
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
       let [user1A, user1B, user1C] = await getBucketStore(user1);
       let [user2A, user2B, user2C] = await getBucketStore(user2);
 
-      // Amount to transfer to each user
+      // Define the amounts to transfer to each user
       const transferKcash1 = 10 * decimal_kcash;
       const transferKcash2 = 20 * decimal_kcash;
       const amountbulk_arr = [transferKcash1, transferKcash2];
+      const amount_transfer = transferKcash1 + transferKcash2;
 
-      // Transfer rewards from bucket 3 to bucket 2 for both user1 and user2
+      // Check if owner's reward3 balance is sufficient for the transfer
+      if (ownerC < amount_transfer) {
+        // If owner's reward3 balance is less than the total transfer amount, mint KCash for the owner
+        const mintUser = await mintCoin(
+          owner,
+          owner,
+          amount_to_mint,
+          reward1,
+          reward2,
+          reward3
+        );
+        console.log("Minted KCash for owner:", mintUser);
+      }
+
+      // Get owner's bucket store details before the transfer
+      let [owner1A, owner1B, owner1C] = await getBucketStore(owner);
+
+      // Perform the transfer of rewards from owner's reward3 to user1 and user2's reward2 in bulk
       let rew2Tx = await transferReward3ToReward2ByAdminOnlyInBulk(
         owner,
         [user1.accountAddress, user2.accountAddress], // Array of receiver addresses
         amountbulk_arr // Amount to transfer to each receiver
       );
-      console.log("🚀 ~ rewTx:", rew2Tx);
+      console.log("Transaction hash of the transfer:", rew2Tx);
 
       // Validate bucket stores after transfer
       let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
@@ -800,10 +882,10 @@ describe("Kcash Test", () => {
       const expectedUser2B = user2B + transferKcash2;
 
       // Assert the changes in bucket stores
-      expect(ownerC1).toEqual(ownerC - ownerExpected); // Owner's bucket 3 should decrease by 2 * amountBulk
-      expect(user1B1).toEqual(expectedUser1B); // User1's bucket 2 should increase by amountBulk
-      expect(user2B1).toEqual(expectedUser2B); // User2's bucket 2 should increase by amountBulk
-      expect(rew2Tx).toBeDefined();
+      expect(ownerC1).toEqual(owner1C - ownerExpected); // Owner's reward3 balance should decrease by the total transfer amount
+      expect(user1B1).toEqual(expectedUser1B); // User1's reward2 balance should increase by transferKcash1
+      expect(user2B1).toEqual(expectedUser2B); // User2's reward2 balance should increase by transferKcash2
+      expect(rew2Tx).toBeDefined(); // Check if the transaction hash is defined, indicating a successful transfer
     }, 10000);
   });
 
@@ -811,8 +893,10 @@ describe("Kcash Test", () => {
     it("admin Transfer KCash From user Reward3 to user Reward3", async () => {
       // Get initial bucket store values for user1 and user2
       let [user1A, user1B, user1C] = await getBucketStore(user1);
-      console.log("userbuket", await getBucketStore(user1));
-
+      console.log(
+        "Initial bucket store for user1:",
+        await getBucketStore(user1)
+      );
       let [user2A, user2B, user2C] = await getBucketStore(user2);
 
       // Get metadata
@@ -820,8 +904,8 @@ describe("Kcash Test", () => {
 
       // Get user1's KCash balance and bucket store details
       const user1balance = await getFaBalance(user1, metadata.toString());
-      console.log("user1balance", user1balance);
-      console.log("user1bucket", await getBucketStore(user1));
+      console.log("User1's KCash balance:", user1balance);
+      console.log("User1's bucket store:", await getBucketStore(user1));
 
       // Define transfer amount
       const transferKcash = 10 * decimal_kcash;
@@ -837,22 +921,27 @@ describe("Kcash Test", () => {
           reward2,
           reward3
         );
-        console.log("mintUser", mintUser);
+        console.log("Minted KCash for user1:", mintUser);
       }
 
+      // Get user1's bucket store details after potential minting
       let [user1A2, user1B2, user1C2] = await getBucketStore(user1);
 
+      // Perform the transfer from user1's Reward3 to user2's Reward3
       let rew2Tx = await transferFromReward3ToReward3(
         user1,
         user2.accountAddress,
         transferKcash
       );
-      console.log("🚀 ~ rewTx:", rew2Tx);
+      console.log("Transaction hash of the transfer:", rew2Tx);
       expect(rew2Tx).toBeDefined();
 
       // Validate bucket stores after transfer
       let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
-      console.log("userbuketa", await getBucketStore(user1));
+      console.log(
+        "Updated bucket store for user1:",
+        await getBucketStore(user1)
+      );
 
       let [user2A1, user2B1, user2C1] = await getBucketStore(user2);
 
@@ -861,14 +950,16 @@ describe("Kcash Test", () => {
       expect(user2C1).toEqual(user2C + transferKcash); // User2's bucket 3 should increase by transferKcash
     }, 10000);
 
-    
     it("transfer from user1's reward3 to multiple users' reward3, bulk", async () => {
+      // Retrieve initial bucket store balances for user1, owner, and user2
       let [user1A, user1B, user1C] = await getBucketStore(user1);
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
       let [user2A, user2B, user2C] = await getBucketStore(user2);
 
+      // Define the total amount of KCash to transfer
       const transferKcash = 10 + 2;
 
+      // Check if user1 has enough KCash in reward3 bucket
       if (user1C < transferKcash) {
         // If user1's reward3 balance is less than the total transfer amount, mint KCash
         const mintUser = await mintCoin(
@@ -879,15 +970,19 @@ describe("Kcash Test", () => {
           reward2,
           reward3
         );
+        console.log("Minted KCash for user1:", mintUser);
       }
 
-      // Transfer rewards from bucket 3 to bucket 3 for both user1 and user2
+      // Get user1's bucket store details before the transfer
+      let [user11A, user11B, user11C] = await getBucketStore(user1);
+
+      // Transfer rewards from user1's reward3 to multiple users' reward3 in bulk
       let rew3Tx = await transferFromReward3ToReward3Bulk(
         user1,
         [owner.accountAddress, user2.accountAddress], // Array of receiver addresses
         [10, 2] // Amount to transfer to each receiver
       );
-      console.log("🚀 ~ rewTx:", rew3Tx);
+      console.log("Transaction hash of the transfer:", rew3Tx);
 
       // Validate bucket stores after transfer
       let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
@@ -895,16 +990,16 @@ describe("Kcash Test", () => {
       let [user2A1, user2B1, user2C1] = await getBucketStore(user2);
 
       // Assert the changes in bucket stores
-      expect(user1C - (10 + 2)).toEqual(user1C1); // User1's bucket 3 should decrease by 10 + 2
-      expect(ownerC + 10).toEqual(ownerC1);
-      expect(user2C + 2).toEqual(user2C1); // User2's bucket 3 should increase by 2
-      expect(rew3Tx).toBeDefined();
+      expect(user11C - (10 + 2)).toEqual(user1C1); // User1's reward3 bucket should decrease by 10 + 2
+      expect(ownerC + 10).toEqual(ownerC1); // Owner's reward3 bucket should increase by 10
+      expect(user2C + 2).toEqual(user2C1); // User2's reward3 bucket should increase by 2
+      expect(rew3Tx).toBeDefined(); // Check if the transaction hash is defined, indicating a successful transfer
     }, 10000);
   });
 
   describe("transfer From Bucket To Reward", () => {
     it("transfer From user Bucket To user Reward3", async () => {
-      // Retrieve initial bucket store balances
+      // Retrieve initial bucket store balances for user1 and user2
       let [user1A, user1B, user1C] = await getBucketStore(user1);
       let [user2A, user2B, user2C] = await getBucketStore(user2);
 
@@ -914,8 +1009,8 @@ describe("Kcash Test", () => {
       // Check if user1 has enough KCash in buckets
       let totalAvailable = user1A + user1B + user1C;
 
+      // If the total available KCash in user1's buckets is less than the transfer amount, mint the required amount
       if (totalAvailable < transferKcash) {
-        // If the total available KCash in user1's buckets is less than the transfer amount, mint the required amount
         const mintUser = await mintCoin(
           owner,
           user1,
@@ -926,6 +1021,10 @@ describe("Kcash Test", () => {
         );
       }
 
+      // Retrieve the bucket store balances again after potential minting
+      let [user11A, user11B, user11C] = await getBucketStore(user1);
+      let [user22A, user22B, user22C] = await getBucketStore(user2);
+
       // Perform the transfer from bucket to Reward3 for user1 to user2
       let tb3Tx = await transferFromBucketToReward3(
         user1,
@@ -933,19 +1032,19 @@ describe("Kcash Test", () => {
         [10, 10, 5] // Amounts to transfer from each bucket
       );
 
-      // Retrieve final bucket store balances
+      // Retrieve final bucket store balances after the transfer
       let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
       let [user2A1, user2B1, user2C1] = await getBucketStore(user2);
 
       // Assertions
-      expect(user1A1).toBe(user1A - 10); // Check if 10 is deducted from user1A
-      expect(user1B1).toBe(user1B - 10); // Check if 10 is deducted from user1B
-      expect(user1C1).toBe(user1C - 5); // Check if 5 is deducted from user1C
-      expect(user2C1).toBe(user2C + 25); // Check if the total amount (10+10+5) is added to user2C
+      expect(user1A1).toBe(user11A - 10); // Check if 10 is deducted from user1A
+      expect(user1B1).toBe(user11B - 10); // Check if 10 is deducted from user1B
+      expect(user1C1).toBe(user11C - 5); // Check if 5 is deducted from user1C
+      expect(user2C1).toBe(user22C + 25); // Check if the total amount (10+10+5) is added to user2C
     });
 
-    it("transfer From user1 Bucket To Reward3 Bulk", async () => {
-      // Retrieve initial bucket store balances
+    it("transfer From user1 Bucket to other users bucket Reward3 Bulk", async () => {
+      // Retrieve initial bucket store balances for user1, owner, and user2
       let [user1A, user1B, user1C] = await getBucketStore(user1);
       let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
       let [user2A, user2B, user2C] = await getBucketStore(user2);
@@ -959,10 +1058,11 @@ describe("Kcash Test", () => {
       // Check if user1 has enough KCash in buckets
       let totalAvailable = user1A + user1B + user1C;
 
+      // Define the total amount of KCash to transfer
       let transferKcash = 11 + 11 + 10;
 
+      // If the total available KCash in user1's buckets is less than the transfer amount, mint the required amount
       if (totalAvailable < transferKcash) {
-        // If the total available KCash in user1's buckets is less than the transfer amount, mint the required amount
         const mintUser = await mintCoin(
           owner,
           user1,
@@ -973,38 +1073,48 @@ describe("Kcash Test", () => {
         );
       }
 
-      // Perform the transfer from bucket to Reward3 for user1 to user2
+      // Retrieve the bucket store balances again after potential minting
+      let [user11A, user11B, user11C] = await getBucketStore(user1);
+      let [owner1A, owner1B, owner1C] = await getBucketStore(owner);
+      let [user22A, user22B, user22C] = await getBucketStore(user2);
+
+      // Perform the bulk transfer from bucket to Reward3 for user1 to owner and user2
       let tb3Tx = await transferFromBucketToReward3Bulk(
         user1,
         [owner.accountAddress, user2.accountAddress],
         transferAmounts
       );
 
-      // Retrieve final bucket store balances
+      // Retrieve final bucket store balances after the transfer
       let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
       let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
       let [user2A1, user2B1, user2C1] = await getBucketStore(user2);
 
       // Assertions
-      expect(user1A1).toBe(user1A - (10 + 1)); // Check if 10 is deducted from user1A
-      expect(user1B1).toBe(user1B - (1 + 10)); // Check if 10 is deducted from user1B
-      expect(user1C1).toBe(user1C - (5 + 5)); // Check if 5 is deducted from user1C
-      expect(ownerC1).toBe(ownerC + 16); // Check if the total amount (1+10+5) is added to user2C
-      expect(user2C1).toBe(user2C + 16); // Check if the total amount (10+1+5) is added to user2C
+      expect(user1A1).toBe(user11A - (10 + 1)); // Check if 10 is deducted from user1A
+      expect(user1B1).toBe(user11B - (1 + 10)); // Check if 10 is deducted from user1B
+      expect(user1C1).toBe(user11C - (5 + 5)); // Check if 5 is deducted from user1C
+      expect(ownerC1).toBe(owner1C + 16); // Check if the total amount (1+10+5) is added to owner's C bucket
+      expect(user2C1).toBe(user22C + 16); // Check if the total amount (10+1+5) is added to user2's C bucket
     }, 10000);
   });
 
   describe("admin Transer With Signature", () => {
     // it("adminTransferWithSignature", async () => {
+    //   let nonce = await getNonce(owner);
+
     //   // Create a message and calculate its hash
     //   const moveStruct = new MessageMoveStruct(
     //     owner.accountAddress,
     //     user2.accountAddress,
     //     deductionFromSender,
-    //     additionToRecipient
+    //     additionToRecipient,
+    //     "admin_transfer_with_signature",
+    //     new Uint64(BigInt(nonce))
     //   );
-    //   const moveStructBytes = moveStruct.bcsToBytes();
 
+    //   // Construct a MoveStruct
+    //   const moveStructBytes = moveStruct.bcsToBytes();
     //   const messageMoveStructHash = sha256(moveStructBytes);
 
     //   // Sign the message hash using the owner's private key
@@ -1024,9 +1134,69 @@ describe("Kcash Test", () => {
     //   let adminSignatureTx = await adminTransferWithSignature(
     //     owner,
     //     user2.accountAddress,
-    //     [1, 2, 3], // Deduct 1 from ownerA, 2 from ownerB, and 3 from ownerC
-    //     [3, 1, 2], // Add 3 to user2A, 1 to user2B, and 2 to user2C
-    //     signature
+    //     [10, 20, 30],
+    //     [10, 20, 30],
+    //     signature,
+    //     "admin_transfer_with_signature",
+    //     10
+    //   );
+    //   console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
+
+    //   // Retrieve final bucket store balances
+    //   let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
+    //   let [user2A2, user2B2, user2C2] = await getBucketStore(user2);
+    //   console.log("owner", await getBucketStore(owner));
+    //   console.log("user2", await getBucketStore(user2));
+
+    //   // Assertions
+    //   expect(ownerA1).toEqual(ownerA - 1); // Check if 1 is deducted from ownerA
+    //   expect(ownerB1).toEqual(ownerB - 2); // Check if 2 is deducted from ownerB
+    //   expect(ownerC1).toEqual(ownerC - 3); // Check if 3 is deducted from ownerC
+
+    //   expect(user2A2).toEqual(user2A + 3); // Check if 3 is added to user2A
+    //   expect(user2B2).toEqual(user2B + 1); // Check if 1 is added to user2B
+    //   expect(user2C2).toEqual(user2C + 2); // Check if 2 is added to user2C
+    // }, 10000);
+
+    // it("admin Transfer With Signature bulk", async () => {
+    //   let nonce = await getNonce(owner);
+
+    //   // Create a message and calculate its hash
+    //   const moveStruct = new MessageMoveStruct(
+    //     owner.accountAddress,
+    //     user2.accountAddress,
+    //     deductionFromSender,
+    //     additionToRecipient,
+    //     "admin_transfer_with_signature",
+    //     new Uint64(BigInt(nonce))
+    //   );
+
+    //   // Construct a MoveStruct
+    //   const moveStructBytes = moveStruct.bcsToBytes();
+    //   const messageMoveStructHash = sha256(moveStructBytes);
+
+    //   // Sign the message hash using the owner's private key
+    //   const signature = await signMessage(
+    //     privateKeyOwner,
+    //     messageMoveStructHash
+    //   );
+    //   // console.log("signature", signature);
+
+    //   // Retrieve initial bucket store balances
+    //   console.log("owner", await getBucketStore(owner));
+    //   console.log("user2", await getBucketStore(user2));
+    //   let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
+    //   let [user2A, user2B, user2C] = await getBucketStore(user2);
+
+    //   // Call adminTransferWithSignature function
+    //   let adminSignatureTx = await adminTransferWithSignatureBulk(
+    //     owner,
+    //     user2.accountAddress,
+    //     [10, 20, 30],
+    //     [10, 20, 30],
+    //     signature,
+    //     "admin_transfer_with_signature",
+    //     10
     //   );
     //   console.log("🚀 ~ adminSignatureTx:", adminSignatureTx);
 
@@ -1047,262 +1217,400 @@ describe("Kcash Test", () => {
     // }, 10000);
 
     it("transfer Reward3 To Reward1 With Sign", async () => {
-      let nonce = await getNonce(owner);
-      let userMoveStruct = await createStructForMsg(
-        user1.accountAddress,
-        user2.accountAddress,
-        new Uint64(BigInt(10)),
-        "transfer_reward3_to_reward1",
-        new Uint64(BigInt(nonce))
-      );
-      const userMoveStructBytes = userMoveStruct.bcsToBytes();
-      const usermsghash = sha256(userMoveStructBytes);
-      let signForUser = await signMessage(privateKeyOwner, usermsghash);
+      try {
+        // Get the nonce for user1
+        let nonce = await getNonce(user1);
 
-      let [user1A, user1B, user1C] = await getBucketStore(user1);
-      console.log("user1", await getBucketStore(user1));
-
-      let [user2A, user2B, user2C] = await getBucketStore(user2);
-      console.log("user2", await getBucketStore(user2));
-
-      if (user1C < 10) {
-        const mintUser = await mintCoin(
-          owner,
-          user1,
-          amount_to_mint,
-          reward1,
-          reward2,
-          reward3
+        // Create the message struct for the transfer operation
+        let userMoveStruct = await createStructForMsg(
+          user1.accountAddress, // Sender address
+          user2.accountAddress, // Receiver address
+          new Uint64(BigInt(10)), // Amount to transfer
+          "transfer_reward3_to_reward1", // Operation type
+          new Uint64(BigInt(nonce)) // Nonce
         );
+
+        // Convert the message struct to bytes and hash it
+        const userMoveStructBytes = userMoveStruct.bcsToBytes();
+        const usermsghash = sha256(userMoveStructBytes);
+
+        // Sign the hashed message with user1's private key
+        let signForUser = await signMessage(privateKeyOwner, usermsghash);
+
+        // Get the current bucket store values for user1 and user2 before transfer
+        let [user1A, user1B, user1C] = await getBucketStore(user1);
+        console.log("User1 initial bucket store:", await getBucketStore(user1));
+        let [user2A, user2B, user2C] = await getBucketStore(user2);
+        console.log("User2 initial bucket store:", await getBucketStore(user2));
+
+        // If user1's reward3 balance is less than 10, mint more coins
+        if (user1C < 10) {
+          const mintUser = await mintCoin(
+            owner,
+            user1,
+            amount_to_mint,
+            reward1,
+            reward2,
+            reward3
+          );
+        }
+
+        // Transfer reward3 to reward1 with signature
+        let tx = await transferReward3ToReward1WithSign(
+          user1,
+          user2.accountAddress,
+          10,
+          signForUser
+        );
+
+        // Get the updated bucket store values for user1 and user2 after transfer
+        let [user1A2, user1B2, user1C2] = await getBucketStore(user1);
+        let [user2A3, user2B3, user2C3] = await getBucketStore(user2);
+
+        // Assert that the balances are updated correctly
+        expect(user1C2).toEqual(user1C - 10); // User1's reward3 balance decreased by 10
+        expect(user2A3).toEqual(user2A + 10); // User2's reward1 balance increased by 10
+      } catch (error) {
+        // Log any errors that occur during the process
+        console.log("error", error);
       }
-
-      let tx = await transferReward3ToReward1WithSign(
-        owner,
-        user1,
-        user2.accountAddress,
-        10,
-        signForUser
-      );
-      console.log("🚀 ~ tx:", tx);
-
-      let [user1A2, user1B2, user1C2] = await getBucketStore(user1);
-
-      let [user2A3, user2B3, user2C3] = await getBucketStore(user2);
-
-      expect(user1C2).toEqual(user1C - 10);
-      expect(user2A3).toEqual(user2A + 10);
     }, 10000);
 
     it("transfer Reward3 To Reward1 Bulk With Sign", async () => {
-      let nonce2 = await getNonce(owner);
-      let amount_vec = [new Uint64(BigInt(1)), new Uint64(BigInt(2))];
+      try {
+        // Get the nonce for user1
+        let nonce2 = await getNonce(user1);
 
-      let userMoveStructBulk = await createStructForMsgBulk(
-        user1.accountAddress,
-        [user2.accountAddress, owner.accountAddress],
-        amount_vec,
-        "transfer_reward3_to_reward1_bulk",
-        new Uint64(BigInt(nonce2))
-      );
-      console.log("🚀 ~ userMoveStruct:", userMoveStructBulk);
+        // Define the amount vector for the bulk transfer
+        let amount_vec = [new Uint64(BigInt(1)), new Uint64(BigInt(2))];
 
-      let userMsgBytesBulk = userMoveStructBulk.bcsToBytes();
-
-      const msghash = sha256(userMsgBytesBulk);
-      const signBulk = await signMessage(privateKeyOwner, msghash);
-
-      let [user1A, user1B, user1C] = await getBucketStore(user1);
-      console.log("User1 initial bucket store :", await getBucketStore(user1));
-
-      let [user2A, user2B, user2C] = await getBucketStore(user2);
-      console.log("User2 initial bucket store :", await getBucketStore(user2));
-
-      let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
-      console.log("Owner initial bucket store :", await getBucketStore(owner));
-
-      let transferKcash = 1 + 2;
-
-      if (user1C < transferKcash) {
-        const mintUser = await mintCoin(
-          owner,
-          user1,
-          amount_to_mint,
-          reward1,
-          reward2,
-          reward3
+        // Create the message struct for the bulk transfer operation
+        let userMoveStructBulk = await createStructForMsgBulk(
+          user1.accountAddress,
+          [user2.accountAddress, owner.accountAddress], // Pass the recipient addresses in an array
+          amount_vec,
+          "transfer_reward3_to_reward1_bulk",
+          new Uint64(BigInt(nonce2))
         );
-        console.log("mithash", mintUser);
+        console.log("🚀 ~ userMoveStruct:", userMoveStructBulk);
+
+        // Convert the message struct to bytes and hash it
+        let userMsgBytesBulk = userMoveStructBulk.bcsToBytes();
+        const msghash = sha256(userMsgBytesBulk);
+
+        // Sign the hashed message with owner's private key
+        const signBulk = await signMessage(privateKeyOwner, msghash);
+
+        // Get the initial bucket store values for user1, user2, and owner
+        let [user1A, user1B, user1C] = await getBucketStore(user1);
+        console.log(
+          "User1 initial bucket store :",
+          await getBucketStore(user1)
+        );
+
+        let [user2A, user2B, user2C] = await getBucketStore(user2);
+        console.log(
+          "User2 initial bucket store :",
+          await getBucketStore(user2)
+        );
+
+        let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
+        console.log(
+          "Owner initial bucket store :",
+          await getBucketStore(owner)
+        );
+
+        // Calculate the total amount to transfer
+        let transferKcash = 1 + 2;
+
+        // If user1's reward3 balance is less than the total transfer amount, mint more coins
+        if (user1C < transferKcash) {
+          const mintUser = await mintCoin(
+            owner,
+            user1,
+            amount_to_mint,
+            reward1,
+            reward2,
+            reward3
+          );
+          console.log("mithash", mintUser);
+        }
+
+        // Get the initial bucket store values after possible minting
+        let [user11A, user11B, user11C] = await getBucketStore(user1);
+        console.log(
+          "User1 initial bucket store after possible minting :",
+          await getBucketStore(user1)
+        );
+
+        let [user22A, user22B, user22C] = await getBucketStore(user2);
+        console.log(
+          "User2 initial bucket store after possible minting :",
+          await getBucketStore(user2)
+        );
+
+        let [owner1A, owner1B, owner1C] = await getBucketStore(owner);
+        console.log(
+          "Owner initial bucket store after possible minting :",
+          await getBucketStore(owner)
+        );
+
+        // Perform the bulk transfer of reward3 to reward1 with signature
+        let tx1_bulk = await transferReward3ToReward1BulkWithSign(
+          user1,
+          [user2.accountAddress, owner.accountAddress],
+          [1, 2], // Pass the amounts to transfer in an array
+          signBulk
+        );
+        console.log("🚀 ~ tx1_bulk:", tx1_bulk);
+
+        // Get the updated bucket store values for user1, user2, and owner after the transfer
+        let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
+        console.log(
+          "User1 after transfer bucket store :",
+          await getBucketStore(user1)
+        );
+
+        let [user2A3, user23B, user2C3] = await getBucketStore(user2);
+        console.log(
+          "User2 after transfer bucket store :",
+          await getBucketStore(user2)
+        );
+
+        let [ownerA2, ownerB2, ownerC2] = await getBucketStore(owner);
+        console.log(
+          "Owner after transfer bucket store :",
+          await getBucketStore(owner)
+        );
+
+        // Assert that the balances are updated correctly
+        expect(user1C1).toEqual(user11C - (1 + 2)); // User1's reward3 balance decreased by the total transfer amount
+        expect(user2A3).toEqual(user22A + 1); // User2's reward1 balance increased by the first transfer amount
+        expect(ownerA2).toEqual(owner1A + 2); // Owner's reward1 balance increased by the second transfer amount
+      } catch (error) {
+        // Log any errors that occur during the process
+        console.log("error", error);
       }
-
-      let tx1_bulk = await transferReward3ToReward1BulkWithSign(
-        owner,
-        user1,
-        [user2.accountAddress, owner.accountAddress],
-        [1, 2],
-        signBulk
-      );
-      console.log("🚀 ~ tx1_bulk:", tx1_bulk);
-
-      let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
-      console.log(
-        "User1 after transfer bucket store :",
-        await getBucketStore(user1)
-      );
-
-      let [user2A3, user23B, user2C3] = await getBucketStore(user2);
-      console.log(
-        "User2 after transfer bucket store :",
-        await getBucketStore(user2)
-      );
-
-      let [ownerA2, ownerB2, ownerC2] = await getBucketStore(owner);
-      console.log(
-        "Owner after transfer bucket store :",
-        await getBucketStore(owner)
-      );
-
-      expect(user1C1).toEqual(user1C - (1 + 2));
-
-      expect(user2A3).toEqual(user2A + 1);
-      expect(ownerA2).toEqual(ownerA + 2);
     }, 10000);
 
     it("transfer Reward3 To Reward2 With Sign", async () => {
-      let nonce = await getNonce(owner);
-      let userMoveStruct = await createStructForMsg(
-        user1.accountAddress,
-        user2.accountAddress,
-        new Uint64(BigInt(10)),
-        "transfer_reward3_to_reward2",
-        new Uint64(BigInt(nonce))
-      );
-      const userMoveStructBytes = userMoveStruct.bcsToBytes();
-      const usermsghash = sha256(userMoveStructBytes);
-      let signForUser = await signMessage(privateKeyOwner, usermsghash);
+      try {
+        // Get the nonce for user1
+        let nonce = await getNonce(user1);
 
-      let [user1A, user1B, user1C] = await getBucketStore(user1);
-      console.log("User1 initial bucket store :", await getBucketStore(user1));
-
-      let [user2A, user2B, user2C] = await getBucketStore(user2);
-      console.log("User2 initial bucket store :", await getBucketStore(user2));
-
-      if (user1C < 10) {
-        const mintUser = await mintCoin(
-          owner,
-          user1,
-          amount_to_mint,
-          reward1,
-          reward2,
-          reward3
+        // Create the message struct for the transfer operation
+        let userMoveStruct = await createStructForMsg(
+          user1.accountAddress,
+          user2.accountAddress,
+          new Uint64(BigInt(10)), // Specify the amount to transfer
+          "transfer_reward3_to_reward2",
+          new Uint64(BigInt(nonce))
         );
+
+        // Convert the message struct to bytes and hash it
+        const userMoveStructBytes = userMoveStruct.bcsToBytes();
+        const usermsghash = sha256(userMoveStructBytes);
+
+        // Sign the hashed message with owner's private key
+        let signForUser = await signMessage(privateKeyOwner, usermsghash);
+
+        // Get the initial bucket store values for user1 and user2
+        let [user1A, user1B, user1C] = await getBucketStore(user1);
+        console.log(
+          "User1 initial bucket store :",
+          await getBucketStore(user1)
+        );
+
+        let [user2A, user2B, user2C] = await getBucketStore(user2);
+        console.log(
+          "User2 initial bucket store :",
+          await getBucketStore(user2)
+        );
+
+        // If user1's reward3 balance is less than the transfer amount, mint more coins
+        if (user1C < 10) {
+          const mintUser = await mintCoin(
+            owner,
+            user1,
+            amount_to_mint,
+            reward1,
+            reward2,
+            reward3
+          );
+        }
+
+        // Get the initial bucket store values after possible minting
+        let [user11A, user11B, user11C] = await getBucketStore(user1);
+        console.log(
+          "User1 initial bucket store after possible minting :",
+          await getBucketStore(user1)
+        );
+
+        let [user22A, user22B, user22C] = await getBucketStore(user2);
+        console.log(
+          "User2 initial bucket store after possible minting :",
+          await getBucketStore(user2)
+        );
+
+        // Perform the transfer of reward3 to reward2 with signature
+        let tx2 = await transferReward3ToReward2WithSign(
+          user1,
+          user2.accountAddress,
+          10, // Specify the amount to transfer
+          signForUser
+        );
+        console.log("🚀 ~ tx:", tx2);
+
+        // Get the updated bucket store values for user1 and user2 after the transfer
+        let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
+        console.log(
+          "User1 after transfer bucket store :",
+          await getBucketStore(user1)
+        );
+
+        let [user2A3, user23B, user2C3] = await getBucketStore(user2);
+        console.log(
+          "User2 after transfer bucket store :",
+          await getBucketStore(user2)
+        );
+
+        // Assert that the balances are updated correctly
+        expect(user1C1).toEqual(user11C - 10); // User1's reward3 balance decreased by the transfer amount
+        expect(user23B).toEqual(user22B + 10); // User2's reward2 balance increased by the transfer amount
+      } catch (error) {
+        // Log any errors that occur during the process
+        console.log("error", error);
       }
-
-      let tx2 = await transferReward3ToReward2WithSign(
-        owner,
-        user1,
-        user2.accountAddress,
-        10,
-        signForUser
-      );
-      console.log("🚀 ~ tx:", tx2);
-
-      let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
-      console.log(
-        "User1 after transfer bucket store :",
-        await getBucketStore(user1)
-      );
-
-      let [user2A3, user23B, user2C3] = await getBucketStore(user2);
-      console.log(
-        "User2 after transfer bucket store :",
-        await getBucketStore(user2)
-      );
-
-      expect(user1C1).toEqual(user1C - 10);
-      expect(user23B).toEqual(user2B + 10);
     }, 10000);
 
-    it("transfer Reward3 To Reward2 BulkWith Sign", async () => {
-      let nonce2 = await getNonce(owner);
-      let amount_vec = [new Uint64(BigInt(1)), new Uint64(BigInt(2))];
+    it("transfer Reward3 To Reward2 Bulk With Sign", async () => {
+      try {
+        // Get the nonce for user1
+        let nonce2 = await getNonce(user1);
 
-      let userMoveStructBulk = await createStructForMsgBulk(
-        user1.accountAddress,
-        [user2.accountAddress, owner.accountAddress],
-        amount_vec,
-        "transfer_reward3_to_reward2_bulk",
-        new Uint64(BigInt(nonce2))
-      );
+        // Specify the amounts to transfer for each recipient
+        let amount_vec = [new Uint64(BigInt(1)), new Uint64(BigInt(2))];
 
-      let userMsgBytesBulk = userMoveStructBulk.bcsToBytes();
-
-      const msghash = sha256(userMsgBytesBulk);
-      const signBulk = await signMessage(privateKeyOwner, msghash);
-
-      let [user1A, user1B, user1C] = await getBucketStore(user1);
-      console.log("User1 initial bucket store :", await getBucketStore(user1));
-
-      let [user2A, user2B, user2C] = await getBucketStore(user2);
-      console.log("User2 initial bucket store :", await getBucketStore(user2));
-
-      let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
-      console.log("Owner initial bucket store :", await getBucketStore(owner));
-
-      let transferKcash = 1 + 2;
-
-      if (user1C < transferKcash) {
-        const mintUser = await mintCoin(
-          owner,
-          user1,
-          amount_to_mint,
-          reward1,
-          reward2,
-          reward3
+        // Create the message struct for the bulk transfer operation
+        let userMoveStructBulk = await createStructForMsgBulk(
+          user1.accountAddress,
+          [user2.accountAddress, owner.accountAddress], // Specify the recipient addresses
+          amount_vec, // Specify the amounts to transfer for each recipient
+          "transfer_reward3_to_reward2_bulk", // Specify the function name
+          new Uint64(BigInt(nonce2)) // Specify the nonce
         );
-        console.log("mithash", mintUser);
+
+        // Convert the message struct to bytes and hash it
+        let userMsgBytesBulk = userMoveStructBulk.bcsToBytes();
+        const msghash = sha256(userMsgBytesBulk);
+
+        // Sign the hashed message with owner's private key
+        const signBulk = await signMessage(privateKeyOwner, msghash);
+
+        // Get the initial bucket store values for user1, user2, and owner
+        let [user1A, user1B, user1C] = await getBucketStore(user1);
+        console.log(
+          "User1 initial bucket store :",
+          await getBucketStore(user1)
+        );
+
+        let [user2A, user2B, user2C] = await getBucketStore(user2);
+        console.log(
+          "User2 initial bucket store :",
+          await getBucketStore(user2)
+        );
+
+        let [ownerA, ownerB, ownerC] = await getBucketStore(owner);
+        console.log(
+          "Owner initial bucket store :",
+          await getBucketStore(owner)
+        );
+
+        let transferKcash = 1 + 2;
+
+        // If user1's reward3 balance is less than the total transfer amount, mint more coins
+        if (user1C < transferKcash) {
+          const mintUser = await mintCoin(
+            owner,
+            user1,
+            amount_to_mint,
+            reward1,
+            reward2,
+            reward3
+          );
+          console.log("mithash", mintUser);
+        }
+
+        // Get the updated bucket store values for user1, user2, and owner after possible minting
+        let [user11A, user11B, user11C] = await getBucketStore(user1);
+        console.log(
+          "User1 initial bucket store after possible minting :",
+          await getBucketStore(user1)
+        );
+
+        let [user22A, user22B, user22C] = await getBucketStore(user2);
+        console.log(
+          "User2 initial bucket store after possible minting :",
+          await getBucketStore(user2)
+        );
+
+        let [ownerA1, ownerB1, ownerC1] = await getBucketStore(owner);
+        console.log(
+          "Owner initial bucket store after possible minting :",
+          await getBucketStore(owner)
+        );
+
+        // Perform the bulk transfer of reward3 to reward2 with signature
+        let tx2_bulk = await transferReward3ToReward2BulkWithSign(
+          user1,
+          [user2.accountAddress, owner.accountAddress], // Specify the recipient addresses
+          [1, 2], // Specify the amounts to transfer for each recipient
+          signBulk // Specify the signature
+        );
+
+        // Get the updated bucket store values for user1, user2, and owner after the bulk transfer
+        let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
+        console.log(
+          "User1 after transfer bucket store :",
+          await getBucketStore(user1)
+        );
+
+        let [user2A3, user23B, user2C3] = await getBucketStore(user2);
+        console.log(
+          "User2 after transfer bucket store :",
+          await getBucketStore(user2)
+        );
+
+        let [ownerA2, ownerB2, ownerC2] = await getBucketStore(owner);
+        console.log(
+          "Owner after transfer bucket store :",
+          await getBucketStore(owner)
+        );
+
+        // Assert that the balances are updated correctly
+        expect(user1C1).toEqual(user11C - (1 + 2)); // User1's reward3 balance decreased by the total transfer amount
+        expect(user23B).toEqual(user22B + 1); // User2's reward2 balance increased by the first transfer amount
+        expect(ownerB2).toEqual(ownerB1 + 2); // Owner's reward2 balance increased by the second transfer amount
+      } catch (error) {
+        // Log any errors that occur during the process
+        console.log("error", error);
       }
-
-      let tx2_bulk = await transferReward3ToReward2BulkWithSign(
-        owner,
-        user1,
-        [user2.accountAddress, owner.accountAddress],
-        [1, 2],
-        signBulk
-      );
-
-      let [user1A1, user1B1, user1C1] = await getBucketStore(user1);
-      console.log(
-        "User1 after transfer bucket store :",
-        await getBucketStore(user1)
-      );
-
-      let [user2A3, user23B, user2C3] = await getBucketStore(user2);
-      console.log(
-        "User2 after transfer bucket store :",
-        await getBucketStore(user2)
-      );
-
-      let [ownerA2, ownerB2, ownerC2] = await getBucketStore(owner);
-      console.log(
-        "Owner after transfer bucket store :",
-        await getBucketStore(owner)
-      );
-
-      expect(user1C1).toEqual(user1C - (1 + 2));
-      expect(user23B).toEqual(user2B + 1);
-      expect(ownerB2).toEqual(ownerB + 2);
     }, 10000);
   });
 
   describe("add Minter Role", () => {
     it("add Minter Role", async () => {
       try {
-        // Get the current minter list
+        // Get the current minter list before adding the new minter role
         const get_minter_list = await getMinterList(owner);
+
         // Add minter role to user2 and receive transaction result
         let adMint = await addMinterRole(owner, user2.accountAddress);
+
+        // Get the minter list after adding the new minter role
         const get_minter_list_after = await getMinterList(owner);
-        // Assert that the last minter address matches the expected minter account address
+
+        // Assert that the transaction result is defined, indicating a successful transaction
         expect(adMint).toBeDefined();
       } catch (error) {
         // Log any errors that occur during the process

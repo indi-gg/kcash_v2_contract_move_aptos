@@ -35,6 +35,15 @@ To deploy or publish your token, follow these steps:
     pnpm run kcash_fungible_asset
     ```
 
+### Creating Keys 
+
+To generate keys including public key, private key, and address for all users including admins, run the following command:
+
+    ```bash
+   pnpm run createKeys
+   ```
+
+
 ## Update Network 
 
 1. Open the tsup.config.ts file and find the line:

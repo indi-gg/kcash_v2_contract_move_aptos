@@ -190,7 +190,7 @@ export async function createStructForAdminTransferSig(
   return adminStructForSign;
 }
 
-class MessageMoveStructBulk extends Serializable {
+export class MessageMoveStructBulk extends Serializable {
   constructor(
     public from: AccountAddress, // where AccountAddress extends Serializable
     public to: AccountAddress[],
@@ -241,32 +241,32 @@ class MessageMoveStructBulk extends Serializable {
   }
 }
 
-const deductnFromSender1 = [
+export const deductnFromSender1 = [
   new Uint64(BigInt(10)),
   new Uint64(BigInt(20)),
   new Uint64(BigInt(30)),
 ];
-const deductnFromSender2 = [
+export const deductnFromSender2 = [
   new Uint64(BigInt(5)),
   new Uint64(BigInt(15)),
   new Uint64(BigInt(25)),
 ];
-const deductnFromSender3 = [
+export const deductnFromSender3 = [
   new Uint64(BigInt(100)),
   new Uint64(BigInt(200)),
   new Uint64(BigInt(300)),
 ];
-const additnToRecipient1 = [
+export const additnToRecipient1 = [
   new Uint64(BigInt(10)),
   new Uint64(BigInt(20)),
   new Uint64(BigInt(30)),
 ];
-const additnToRecipient2 = [
+export const additnToRecipient2 = [
   new Uint64(BigInt(5)),
   new Uint64(BigInt(15)),
   new Uint64(BigInt(25)),
 ];
-const additnToRecipient3 = [
+export const additnToRecipient3 = [
   new Uint64(BigInt(100)),
   new Uint64(BigInt(200)),
   new Uint64(BigInt(300)),
@@ -966,13 +966,12 @@ export async function transferCoinBulk(
   amount: AnyNumber[]
 ): Promise<string> {
   try {
-    const transaction = await aptos.transaction.build.multiAgent({
+    const transaction = await aptos.transaction.build.simple({
       sender: from.accountAddress,
       data: {
         function: `${owner.accountAddress}::fa_coin::bulk_transfer`,
         functionArguments: [toAddress, amount],
       },
-      secondarySignerAddresses: [from.accountAddress],
     });
 
     const senderAuthenticator = await aptos.transaction.sign({

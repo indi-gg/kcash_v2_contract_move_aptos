@@ -11,17 +11,45 @@ The KCash token is designed to represent a fungible asset on the Aptos blockchai
 
 Install with your favorite package manager such as npm, yarn, or pnpm:
 
-Run this command in root as well as in the typescript directory.
+Here 'pnpm' is used
+
+1. Run this command in root directory.
+
+    ```bash
+    pnpm install 
+    ```
+
+    ```bash
+    pnpm build 
+    ```
+
+2. Navigate to the typescript directory and Install there as well.
+
+    ```bash
+    cd indigg/typescript
+    ```
+
+    ```bash
+    pnpm install 
+    ```
+
+
+To install Jest for testing, run below command:
 
 ```bash
-pnpm install 
+cd indigg/typescript
 ```
-
-Run this command in root directory.
 
 ```bash
-pnpm build 
+pnpm install
 ```
+
+```bash
+pnpm jest
+```
+
+
+
 ## Token Deployment
 
 To deploy or publish your token, follow these steps:
@@ -35,14 +63,25 @@ To deploy or publish your token, follow these steps:
     pnpm run kcash_fungible_asset
     ```
 
-### Creating Keys 
+## Creating Keys 
 
 To generate keys including public key, private key, and address for all users including admins, run the following command:
+```bash
+pnpm run createKeys
+```
 
-    ```bash
-   pnpm run createKeys
-   ```
+## Testing 
 
+1. Navigate to the typescript folder.
+
+```bash
+cd indigg/typescript
+```
+
+2. Run the following command to test:
+```bash
+pnpm jest
+```
 
 ## Update Network 
 

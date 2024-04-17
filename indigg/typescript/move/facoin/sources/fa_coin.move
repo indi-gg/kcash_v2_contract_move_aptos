@@ -171,7 +171,7 @@ module FACoin::fa_coin {
             Stores the global storage for the addresses of  signer role
         */
         let s_vec = vector::empty<vector<u8>>();
-        vector::push_back<vector<u8>>(&mut s_vec, x"cc0a080adc708ea42d2c879a0ca895d50fced3ff5c3f7b31812187839cded7e2");
+        vector::push_back<vector<u8>>(&mut s_vec, x"cc5641c4ff082ab4ccd9201bf82bbcfa6aedb258f32bd2c0c42d58b23fa8773e");
         move_to(admin, AdminSigner{signer_vec: s_vec});
 
         /*
@@ -346,18 +346,17 @@ module FACoin::fa_coin {
    
 
     // Admin Transfers with Signature
-    public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductnFromSender: vector<u64>, additnToRecipient: vector<u64>, signature: vector<u8>, method: String, nonce: u64)
+    public entry fun admin_transfer_with_signature(admin: &signer, to: address, deductnFromSender: vector<u64>, additnToRecipient: vector<u64>, signature: vector<u8>)
     acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce, AdminSigner {
-
+        let nonce = get_nonce(signer::address_of(admin));
         let message = AdminTransferSignature{
             from: signer::address_of(admin),
-            to: to,
+            to,
             deductionFromSender: deductnFromSender,
             additionToRecipient: additnToRecipient,
-            method: method,
-            nonce: nonce
-        };
-        
+            method: string::utf8(b"admin_transfer_with_signature"),
+            nonce
+        };     
         let messag_bytes = bcs::to_bytes<AdminTransferSignature>(&message);
         let message_hash = hash::sha2_256(messag_bytes);
 
@@ -367,17 +366,13 @@ module FACoin::fa_coin {
 
         // event::emit<MessageHash>(MessageHash{message, messag_bytes, message_hash, is_signature_valid});
         event::emit<AdminTransferWithSignatureEvent>(AdminTransferWithSignatureEvent{message, is_signature_valid});
-
-        if(is_signature_valid == true) {
-            assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
-            assert!(vector::length(&deductnFromSender) == vector::length(&additnToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
-            let (r1, r2, r3) = (*vector::borrow(&deductnFromSender, 0), *vector::borrow(&deductnFromSender, 1), *vector::borrow(&deductnFromSender, 2));
-
-            withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
-
-            deposit_to_bucket(to, *vector::borrow(&additnToRecipient, 0), *vector::borrow(&additnToRecipient, 1), *vector::borrow(&additnToRecipient, 2));
-            transfer_internal(admin, to, r1+r2+r3);
-        }
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        assert!(vector::length(&deductnFromSender) == vector::length(&additnToRecipient), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
+        let (r1, r2, r3) = (*vector::borrow(&deductnFromSender, 0), *vector::borrow(&deductnFromSender, 1), *vector::borrow(&deductnFromSender, 2));
+        withdraw_rewards_from_bucket(signer::address_of(admin), r1, r2, r3);
+        deposit_to_bucket(to, *vector::borrow(&additnToRecipient, 0), *vector::borrow(&additnToRecipient, 1), *vector::borrow(&additnToRecipient, 2));
+        transfer_internal(admin, to, r1+r2+r3);
+        update_nonce(signer::address_of(admin));
     }
 
     struct AdminTransferSignatureBulk has drop, store {
@@ -397,12 +392,15 @@ module FACoin::fa_coin {
     struct AdminTransferWithSignatureBulk has drop, store{
         message1: AdminTransferSignatureBulk,
         is_signature_valid: bool,
+        nonce: u64,
     }
 
     // Admin Transfers with Signature Bulk
-      public entry fun admin_transfer_with_signature_bulk(admin: &signer, to_vec: vector<address>, deductnFromSender1: vector<u64>, deductnFromSender2: vector<u64>, deductnFromSender3: vector<u64>, additnToRecipient1: vector<u64>, additnToRecipient2: vector<u64>, additnToRecipient3: vector<u64>, signature: vector<u8>, method: String, nonce: u64)
+      public entry fun admin_transfer_with_signature_bulk(admin: &signer, to_vec: vector<address>, deductnFromSender1: vector<u64>, deductnFromSender2: vector<u64>, deductnFromSender3: vector<u64>, additnToRecipient1: vector<u64>, additnToRecipient2: vector<u64>, additnToRecipient3: vector<u64>, signature: vector<u8>)
         acquires ManagedFungibleAsset, BucketStore, BucketCore, ManagedNonce, AdminSigner {
         assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+
+        let nonce = get_nonce(signer::address_of(admin));
 
         let message1 = AdminTransferSignatureBulk{
             from: signer::address_of(admin),
@@ -413,17 +411,18 @@ module FACoin::fa_coin {
             additionToRecipient1: additnToRecipient1,
             additionToRecipient2: additnToRecipient2,
             additionToRecipient3: additnToRecipient3,
-            method: method,
-            nonce: nonce
+            method: string::utf8(b"admin_transfer_with_signature_bulk"),
+            nonce
         };
         
         let messag_bytes = bcs::to_bytes<AdminTransferSignatureBulk>(&message1);
         let message_hash = hash::sha2_256(messag_bytes);
 
         // Verify designated signer with signature
-
         let is_signature_valid = signature_verification(admin, message_hash, signature, nonce);
-        event::emit<AdminTransferWithSignatureBulk>(AdminTransferWithSignatureBulk{message1, is_signature_valid});
+
+
+        event::emit<AdminTransferWithSignatureBulk>(AdminTransferWithSignatureBulk{message1, is_signature_valid, nonce});
         assert!(is_signature_valid, error::permission_denied(EINVALID_SIGNATURE));
 
 
@@ -452,7 +451,8 @@ module FACoin::fa_coin {
                 if (i >= len) break;
             };
 
-        }
+        };
+        update_nonce(signer::address_of(admin));
 
     }
 
@@ -731,7 +731,6 @@ module FACoin::fa_coin {
      * @param deductionFromSender The vec containing the rewards to be deducted from the sender.
      * @param additionToRecipient The vec containing the rewards to be added to the recipient.
     */
-
     public entry fun admin_transfer(admin: &signer, to: address, deductionFromSender: vector<u64>, additionToRecipient: vector<u64>)
         acquires ManagedFungibleAsset, BucketStore, BucketCore, AdminTransferRole
     {

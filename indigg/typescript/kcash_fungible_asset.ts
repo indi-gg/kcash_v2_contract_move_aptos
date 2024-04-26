@@ -444,7 +444,18 @@ export async function getAdminTransferList() {
     functionArguments: [],
   };
   const res = await aptos.view({ payload });
-  console.log("🚀 ~ getMinterList ~ res:", res);
+  console.log("🚀 ~ getAdminTransfer ~ res:", res);
+
+  return res.toString();
+}
+// To get the list of the list of addresses with minter role
+export async function getSignersList() {
+  const payload: InputViewFunctionData = {
+    function: `${owner.accountAddress}::fa_coin::get_signers`,
+    functionArguments: [],
+  };
+  const res = await aptos.view({ payload });
+  console.log("🚀 ~ getSignerList ~ res:", res);
 
   return res.toString();
 }
@@ -507,12 +518,58 @@ export async function addMinterRole(admin: Account, minter: AccountAddress) {
 
   return pendingTxn.hash;
 }
+// Remove minter role to an account
+export async function removeMinterRole(admin: Account, minter: AccountAddress) {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${owner.accountAddress}::fa_coin::remove_minter_role`,
+      functionArguments: [minter],
+    },
+  });
+
+  const senderAuthenticator = await aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
+  });
+
+  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
+
+  return pendingTxn.hash;
+}
 // Add admin transfer role to an account
 export async function addSigner(admin: Account, admin_transfer: Uint8Array) {
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
       function: `${owner.accountAddress}::fa_coin::add_signer_pkey`,
+      functionArguments: [admin_transfer],
+    },
+  });
+
+  const senderAuthenticator = await aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
+  });
+
+  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
+
+  return pendingTxn.hash;
+}
+// Add admin transfer role to an account
+export async function removeSigner(admin: Account, admin_transfer: Uint8Array) {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${owner.accountAddress}::fa_coin::remove_signer_role`,
       functionArguments: [admin_transfer],
     },
   });
@@ -539,6 +596,32 @@ export async function addAdminTransferRole(
     sender: admin.accountAddress,
     data: {
       function: `${owner.accountAddress}::fa_coin::add_admin_transfer`,
+      functionArguments: [admin_transfer],
+    },
+  });
+
+  const senderAuthenticator = await aptos.transaction.sign({
+    signer: admin,
+    transaction,
+  });
+  const pendingTxn = await aptos.transaction.submit.simple({
+    transaction,
+    senderAuthenticator,
+  });
+
+  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
+
+  return pendingTxn.hash;
+}
+// Add admin transfer role to an account
+export async function removeAdminTransferRole(
+  admin: Account,
+  admin_transfer: AccountAddress
+) {
+  const transaction = await aptos.transaction.build.simple({
+    sender: admin.accountAddress,
+    data: {
+      function: `${owner.accountAddress}::fa_coin::remove_admin_transfer_role`,
       functionArguments: [admin_transfer],
     },
   });
@@ -1450,7 +1533,42 @@ async function main_1() {
   );
   console.log("🚀 ~ main_1 ~ tx:", tx);
 
-  await printVal(metadataAddress)
+  await printVal(metadataAddress);
+
+  console.log(
+    "Assigning minter role to user 1",
+    await addMinterRole(owner, user1.accountAddress)
+  );
+
+  // /* Remove admin transfer ability from user1 */
+  console.log("Minter list: ", await getMinterList());
+  console.log(
+    "Removing the minter role of user1: ",
+    await removeMinterRole(owner, user1.accountAddress)
+  );
+  console.log("Minter list after removing an acount: ", await getMinterList());
+
+  // /* Remove admin transfer ability from user1 */
+  console.log("Adimin transfer list: ", await getAdminTransferList());
+  console.log(
+    "Removing the admin transfer role of user1: ",
+    await removeAdminTransferRole(owner, user1.accountAddress)
+  );
+  console.log(
+    "Admin transfer list after removing an acount: ",
+    await getAdminTransferList()
+  );
+
+  // /* Remove admin transfer ability from user1 */
+  console.log("Signers list: ", await getSignersList());
+  console.log(
+    "Removing the signer role of signer: ",
+    await removeSigner(owner, signer.publicKey.toUint8Array())
+  );
+  console.log(
+    "Signer list after removing an acount: ",
+    await getAdminTransferList()
+  );
 }
 
-// main_1();
+main_1();

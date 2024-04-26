@@ -30,6 +30,7 @@ module FACoin::fa_coin {
     const ESIGNATURE_ALREADY_USED: u64 = 8;
     const EINVALID_ROLE: u64 = 9;
     const EALREADY_EXIST: u64 = 10;
+    const EROLE_NOT_EXIST: u64 = 11;
 
     const ASSET_SYMBOL: vector<u8> = b"FA";
     const BUCKET_CORE_SEED: vector<u8> = b"BA";
@@ -126,6 +127,12 @@ module FACoin::fa_coin {
         is_signature_valid: bool
     }
 
+    #[event]
+    struct RemoveRole has drop, store{
+        role: String,
+        removed_user: address,
+    }
+
     // to check if the address is of admin
     fun is_owner(owner: address) : bool{
         if (&owner == &@FACoin) true else false
@@ -171,7 +178,7 @@ module FACoin::fa_coin {
             Stores the global storage for the addresses of  signer role
         */
         let s_vec = vector::empty<vector<u8>>();
-        vector::push_back<vector<u8>>(&mut s_vec, x"e31ec21206d8d38f5a28298a8e2fc5def690e32e0b38c921dd5532e13c3e8bdb");
+        vector::push_back<vector<u8>>(&mut s_vec, x"85e04e72fe0dd9f5a0563dc52ca3dd83307d05a36e01de9a9cffbb11f5d12b76");
         move_to(admin, AdminSigner{signer_vec: s_vec});
 
         /*
@@ -219,6 +226,24 @@ module FACoin::fa_coin {
     }
 
     /* Verifies that admin_transfer is eligible for transfer or not*/
+    fun is_signer(signer_pubkey: vector<u8>): bool acquires AdminSigner{
+        let t_vec = borrow_global<AdminSigner>(@FACoin).signer_vec;
+        let len = vector::length(&t_vec);
+        let res = false;
+        let i = 0;
+        loop {
+            let role = vector::borrow(&t_vec, i);
+            if(role == &signer_pubkey){
+                res = true;
+                break
+            };
+            i = i + 1;
+            if (i >= len) break;
+        };
+        res
+    }
+
+    /* Verifies that admin_transfer is eligible for transfer or not*/
     fun verifyAdminTransfer(admin_transfer: address): bool acquires AdminTransferRole{
         let t_vec = borrow_global<AdminTransferRole>(@FACoin).transfer_role_vec;
         let len = vector::length(&t_vec);
@@ -245,6 +270,11 @@ module FACoin::fa_coin {
     #[view]
     public fun get_minter(): vector<address> acquires AdminMinterRole{
         borrow_global_mut<AdminMinterRole>(@FACoin).mint_role_vec
+    }
+
+    #[view]
+    public fun get_signers(): vector<vector<u8>> acquires AdminSigner{
+        borrow_global_mut<AdminSigner>(@FACoin).signer_vec
     }
 
     #[view]
@@ -681,6 +711,67 @@ module FACoin::fa_coin {
             if (i >= len) break;
         };
         vector::push_back<address>(&mut transfer_struct.transfer_role_vec, new_admin_transfer);
+    }
+
+    /* To remove minter role of an address 
+        Only admin can invoke this*/
+    public entry fun remove_minter_role(admin: &signer, minter: address) acquires AdminMinterRole{
+        assert!(verifyMinter(minter), error::invalid_argument(EROLE_NOT_EXIST));
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let minter_struct = borrow_global_mut<AdminMinterRole>(@FACoin);
+        let len = vector::length(&minter_struct.mint_role_vec);
+        let i = 0;
+        loop {
+            let minter_ad = vector::borrow(&minter_struct.mint_role_vec, i);
+            if(*minter_ad == minter){
+                vector::remove(&mut minter_struct.mint_role_vec, i);
+                event::emit(RemoveRole { role: to_string(&std::string::utf8(b"AdminMinterRole")) , removed_user: minter, });
+                break
+            };
+            i = i + 1;
+            if (i >= len) break;
+        };
+
+    }
+    /* To remove transfer role of an address 
+        Only admin can invoke this*/
+    public entry fun remove_admin_transfer_role(admin: &signer, admin_transfer: address) acquires AdminTransferRole{
+        assert!(verifyAdminTransfer(admin_transfer), error::invalid_argument(EROLE_NOT_EXIST));
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let transfer_struct = borrow_global_mut<AdminTransferRole>(@FACoin);
+        let len = vector::length(&transfer_struct.transfer_role_vec);
+        let i = 0;
+        loop {
+            let admin_transfer_ad = vector::borrow(&transfer_struct.transfer_role_vec, i);
+            if(*admin_transfer_ad == admin_transfer){
+                vector::remove(&mut transfer_struct.transfer_role_vec, i);
+                event::emit(RemoveRole { role: to_string(&std::string::utf8(b"AdminTransferRole")) , removed_user: admin_transfer, });
+                break
+            };
+            i = i + 1;
+            if (i >= len) break;
+        };
+
+    }
+    /* To remove signer role of an address 
+        Only admin can invoke this*/
+    public entry fun remove_signer_role(admin: &signer, signr: vector<u8>) acquires AdminSigner{
+        assert!(is_signer(signr), error::invalid_argument(EROLE_NOT_EXIST));
+        assert!(is_owner(signer::address_of(admin)), error::permission_denied(ENOT_OWNER));
+        let signer_struct = borrow_global_mut<AdminSigner>(@FACoin);
+        let len = vector::length(&signer_struct.signer_vec);
+        let i = 0;
+        loop {
+            let signer_ad = vector::borrow(&signer_struct.signer_vec, i);
+            if(*signer_ad == signr){
+                vector::remove(&mut signer_struct.signer_vec, i);
+                // event::emit(RemoveRole { role: to_string(&std::string::utf8(b"AdminSigner")) , removed_user: signr, });
+                break
+            };
+            i = i + 1;
+            if (i >= len) break;
+        };
+
     }
 
     // :!:>mint

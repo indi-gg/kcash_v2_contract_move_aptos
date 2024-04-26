@@ -62,6 +62,11 @@ import {
   deductnFromSender2,
   deductnFromSender3,
   createStructForAdminTransferSigBulk,
+  removeMinterRole,
+  getAdminTransferList,
+  removeAdminTransferRole,
+  getSignersList,
+  removeSigner,
 } from "../kcash_fungible_asset";
 
 // Importing SHA256 hash function
@@ -1287,7 +1292,7 @@ describe("Kcash Test", () => {
         await getBucketStore(user2);
       let [user3_final_r1, user3_final_r2, user3_final_r3] =
         await getBucketStore(user3);
-      
+
       // Assertions
       expect(owner_final_r1).toEqual(owner_initial_r1 - 3); // Check if 1 is deducted from owner
       expect(owner_final_r2).toEqual(owner_initial_r2 - 3); // Check if 1 is deducted from owner
@@ -1705,6 +1710,91 @@ describe("Kcash Test", () => {
       } catch (error) {
         // Log any errors that occur during the process
         // console.log("error", error);
+      }
+    });
+  });
+
+  describe("remove roles", () => {
+    it("remove the signer role of an address", async () => {
+      try {
+        let flag = false;
+        let signers = (await getSignersList()).split(",");
+        console.log("Signers: ", signers);
+
+        for (let i = 0; i < signers.length; i++) {
+          const usr = signers[i];
+
+          if (usr == user1.publicKey.toString()) {
+            flag = true;
+            console.log("Removing the signer role of user1: ");
+            let removeUser1 = await removeSigner(
+              owner,
+              user1.publicKey.toUint8Array()
+            );
+            console.log(
+              "Signer list after removing an acount: ",
+              await getSignersList()
+            );
+            expect(removeUser1).toBeDefined();
+          }
+        }
+        !flag ? console.log("User1 is not a signer") : "";
+      } catch (error) {
+        console.log("🚀 ~ it ~ error:", error);
+      }
+    });
+    it("remove the admin transfer role of an address", async () => {
+      try {
+        let flag = false;
+        let adminTransfer = (await getAdminTransferList()).split(",");
+        console.log("🚀 adminTransfer List:", adminTransfer);
+        for (let i = 0; i < adminTransfer.length; i++) {
+          const usr = adminTransfer[i];
+
+          if (usr == user1.accountAddress.toString()) {
+            flag = true;
+            console.log("Removing the transfer role of user1: ");
+            let removeUser1 = await removeAdminTransferRole(
+              owner,
+              user1.accountAddress
+            );
+            console.log(
+              "Admin transfer list after removing an acount: ",
+              await getAdminTransferList()
+            );
+            expect(removeUser1).toBeDefined();
+          }
+        }
+        !flag ? console.log("User1 is not asssigned with a transfer role") : "";
+      } catch (error) {
+        console.log("🚀 ~ it ~ error:", error);
+      }
+    });
+    it("remove the minter role of an address", async () => {
+      try {
+        let flag = false;
+        let minters = (await getMinterList()).split(",");
+        console.log("🚀  minters list :", minters);
+        for (let i = 0; i < minters.length; i++) {
+          const element = minters[i];
+
+          if (element == user1.accountAddress.toString()) {
+            flag = true;
+            console.log("Removing the minter role of user1: ");
+            let removeUser1 = await removeMinterRole(
+              owner,
+              user1.accountAddress
+            );
+            console.log(
+              "Minter list after removing an acount: ",
+              await getMinterList()
+            );
+            expect(removeUser1).toBeDefined();
+          }
+        }
+        !flag ? console.log("User1 is not a minter") : "";
+      } catch (error) {
+        console.log("🚀 ~ it ~ error:", error);
       }
     });
   });

@@ -1,13 +1,13 @@
 [package]
-name = "facoin"
+name = "kcash"
 version = "1.0.0"
 authors = []
 
 [addresses]
-FACoin = "_"
+KCashAdmin = "_"
 
 [dev-addresses]
-FACoin = '0x12345'
+KCashAdmin = '0x12345'
 
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-core.git"

@@ -40,7 +40,7 @@ module KCashAdmin::kcash {
     const BUCKET_CORE_SEED: vector<u8> = b"BA";
     const BUCKET_COLLECTION_DESCRIPTION: vector<u8> = b"Bucket collections";
     const BUCKET_COLLECTION_NAME: vector<u8> = b"Bucket store";
-    const FIRST_SIGNER_KEY: vector<u8> = x"0559d307001358463e29c9cadcffb4c86104fcc535a790ad6bd1ab0259bc3830";
+    const FIRST_SIGNER_KEY: vector<u8> = x"72717d170bb83e81874da66b6f94755bfc6f67b7ed450c3a64cab316bcce32b7";
 
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -240,29 +240,29 @@ module KCashAdmin::kcash {
         )// <:!:initialize
     }
 
-     /* *** Access control functions *** */
+    /* *** Access control functions *** */
 
     // to check if the address is of admin
-    fun is_owner(owner: address) : bool{
+    inline fun is_owner(owner: address) : bool{
         owner == @KCashAdmin
     }
 
     /* Verifies that minter is eligible for mint or not*/
-    fun verifyMinter(minter: &address): bool acquires AdminMinterRole{
+    inline fun verifyMinter(minter: &address): bool acquires AdminMinterRole{
         let m_vec = borrow_global<AdminMinterRole>(@KCashAdmin).mint_role_vec;
         assert!(!vector::is_empty(&m_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
         vector::contains(&m_vec, minter)
     }
 
     /* Verifies that admin_transfer is eligible for transfer or not*/
-    fun is_signer(signer_pubkey: &vector<u8>): bool acquires AdminSigner{
+    inline fun is_signer(signer_pubkey: &vector<u8>): bool acquires AdminSigner{
         let t_vec = borrow_global<AdminSigner>(@KCashAdmin).signer_vec;
         assert!(!vector::is_empty(&t_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
         vector::contains(&t_vec, signer_pubkey)
     }
 
     /* Verifies that admin_transfer is eligible for transfer or not*/
-    fun verifyAdminTransfer(admin_transfer: &address): bool acquires AdminTransferRole{
+    inline fun verifyAdminTransfer(admin_transfer: &address): bool acquires AdminTransferRole{
         let t_vec = borrow_global<AdminTransferRole>(@KCashAdmin).transfer_role_vec;
         assert!(!vector::is_empty(&t_vec), error::invalid_argument(EINVALID_ARGUMENTS_LENGTH));
         vector::contains(&t_vec, admin_transfer)
@@ -429,13 +429,13 @@ module KCashAdmin::kcash {
     }
 
     // Private function to update the nonce of the passed address
-    fun update_nonce(admin: &address) acquires ManagedNonce{
+    inline fun update_nonce(admin: &address) acquires ManagedNonce{
         let c = borrow_global_mut<ManagedNonce>(*admin);
         c.nonce = c.nonce + 1;
     }
 
     // initialize the nonce for the user if it doesnot has
-    fun ensure_nonce(user: &signer) : u64 acquires ManagedNonce{
+    inline fun ensure_nonce(user: &signer) : u64 acquires ManagedNonce{
         if (!exists<ManagedNonce>(signer::address_of(user))){
             move_to(user, ManagedNonce{ nonce: 0 });
             0

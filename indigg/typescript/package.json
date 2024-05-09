@@ -5,6 +5,7 @@
   "main": "simple_transfer.ts",
   "scripts": {
     "kcash_fungible_asset": "ts-node kcash_fungible_asset.ts",
+    "kcash_treasury": "ts-node kcash_treasury.ts",
     "kcash_fa_cust": "ts-node kcash_fa_cust.ts",
     "createKeys": "ts-node createKeys.ts",
     "counter": "ts-node counter.ts"

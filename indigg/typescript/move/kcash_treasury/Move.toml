@@ -1,13 +1,14 @@
 [package]
-name = "kcash"
+name = "kcash_treasury"
 version = "1.0.0"
 authors = []
 
 [addresses]
-KCashAdmin = "_"
+KCashTreasury = "0x6de4c98ccd30a8f663c5d8e3ff787b4f2da083c8f7069c27c49dab3ce318c7e2"
+FACoin = "0x06b43eae979756527d8475fd3645d149177cdef13ecec1d1d65d04d420411c55"
 
 [dev-addresses]
-KCashAdmin = '0x12345'
+KCashTreasury = '0x12345'
 
 
 [dependencies.AptosFramework]
@@ -19,3 +20,6 @@ subdir = "aptos-move/framework/aptos-framework"
 git = 'https://github.com/aptos-labs/aptos-core.git'
 rev = 'mainnet'
 subdir = 'aptos-move/framework/aptos-token-objects'
+
+[dependencies.facoin]
+local = "../facoin"

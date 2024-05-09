@@ -30,10 +30,9 @@ console.log("APTOS_NETWORK3000", APTOS_NETWORK);
 const config = new AptosConfig({ network: APTOS_NETWORK });
 const aptos = new Aptos(config);
 
-const module_path = "move/kcash"; // Path to the package which has the module
-const output_file_path = "move/kcash/kcash.json"; // Path to JSON file
-const address_name = "KCashAdmin"; // Address name from move.toml
-const module_name = "kcash";
+const module_path = "move/kcash_treasury"; // Path to the package which has the module
+const output_file_path = "move/kcash_treasury/kcash_treasury.json"; // Path to JSON file
+const address_name = "KCashTreasury"; // Address name from move.toml
 const decimal_kcash = 1;
 console.log("🚀 ~ decimal_kcash:", decimal_kcash);
 
@@ -52,10 +51,10 @@ export class MessageMoveStruct extends Serializable {
   constructor(
     public from: AccountAddress, // where AccountAddress extends Serializable
     public to: AccountAddress, // where AccountAddress extends Serializable
-    public method: string,
-    public nonce: Uint64,
     public deductionFromSender: Uint64[],
     public additionToRecipient: Uint64[],
+    public method: string,
+    public nonce: Uint64
   ) {
     super();
   }
@@ -63,8 +62,6 @@ export class MessageMoveStruct extends Serializable {
   serialize(serializer: Serializer): void {
     serializer.serialize(this.from); // Composable serialization of another Serializable object
     serializer.serialize(this.to);
-    serializer.serializeStr(this.method);
-    serializer.serialize(this.nonce);
 
     serializer.serializeU32AsUleb128(deductionFromSender.length);
     for (const uint64 of this.deductionFromSender) {
@@ -76,6 +73,8 @@ export class MessageMoveStruct extends Serializable {
       serializer.serialize(uint64);
     }
 
+    serializer.serializeStr(this.method);
+    serializer.serialize(this.nonce);
   }
 }
 
@@ -93,8 +92,6 @@ class UserMessageStructBulk extends Serializable {
 
   serialize(serializer: Serializer): void {
     serializer.serialize(this.from);
-    serializer.serializeStr(this.method);
-    serializer.serialize(this.nonce);
     // serializer.serializeU32AsUleb128(this.to.length);
     serializer.serializeU32AsUleb128(this.to.length);
     for (let i = 0; i < this.to.length; i++) {
@@ -104,6 +101,8 @@ class UserMessageStructBulk extends Serializable {
     for (const amt of this.amount) {
       serializer.serialize(amt);
     }
+    serializer.serializeStr(this.method);
+    serializer.serialize(this.nonce);
   }
 }
 
@@ -137,8 +136,8 @@ class UserMessageStruct extends Serializable {
   serialize(serializer: Serializer): void {
     serializer.serialize(this.from);
     serializer.serialize(this.to);
-    serializer.serializeStr(this.method);
     serializer.serialize(this.amount);
+    serializer.serializeStr(this.method);
     serializer.serialize(this.nonce);
   }
 }
@@ -183,10 +182,10 @@ export async function createStructForAdminTransferSig(
   const adminStructForSign = new MessageMoveStruct(
     admin,
     to,
-    method.toString(),
-    nonce,
     deductionFromSender,
     additionToRecipient,
+    method.toString(),
+    nonce
   );
   return adminStructForSign;
 }
@@ -213,8 +212,6 @@ export class MessageMoveStructBulk extends Serializable {
     for (const address of this.to) {
       serializer.serialize(address);
     }
-    serializer.serializeStr(this.method);
-    serializer.serialize(this.nonce);
     serializer.serializeU32AsUleb128(deductnFromSender1.length);
     for (const uint64 of this.deductnFromSender1) {
       serializer.serialize(uint64);
@@ -239,6 +236,8 @@ export class MessageMoveStructBulk extends Serializable {
     for (const uint64 of this.additnToRecipient3) {
       serializer.serialize(uint64);
     }
+    serializer.serializeStr(this.method);
+    serializer.serialize(this.nonce);
   }
 }
 
@@ -307,11 +306,15 @@ export async function createStructForAdminTransferSigBulk(
 let owner_kp = JSON.parse(fs.readFileSync("./keys/owner.json", "utf8"));
 const privateKeyOwner = new Ed25519PrivateKey(owner_kp.privateKey);
 const publicKeyOwner = new Ed25519PublicKey(owner_kp.publicKey);
-const owner = Account.fromPrivateKey({ privateKey: privateKeyOwner });
+// const owner = Account.fromPrivateKey({ privateKey: privateKeyOwner });
+const user1 = Account.fromPrivateKey({ privateKey: privateKeyOwner });
+
 
 let user_kp = JSON.parse(fs.readFileSync("./keys/user.json", "utf8"));
 const privateKeyuser1 = new Ed25519PrivateKey(user_kp.privateKey);
-const user1 = Account.fromPrivateKey({ privateKey: privateKeyuser1 });
+// const user1 = Account.fromPrivateKey({ privateKey: privateKeyuser1 });
+const owner = Account.fromPrivateKey({ privateKey: privateKeyuser1 });
+
 
 let user2_kp = JSON.parse(fs.readFileSync("./keys/user2.json", "utf8"));
 const privateKeyuser2 = new Ed25519PrivateKey(user2_kp.privateKey);
@@ -368,7 +371,7 @@ export async function compileAndDeploy() {
 // To get Nonce of the owner
 export async function getNonce(admin: Account) {
   const payload: InputViewFunctionData = {
-    function: `${owner.accountAddress}::${module_name}::get_nonce`,
+    function: `${owner.accountAddress}::fa_coin::get_nonce`,
     functionArguments: [admin.accountAddress],
   };
   const res = (await aptos.view<[AnyNumber]>({ payload }))[0];
@@ -379,7 +382,7 @@ export async function getMetadata(admin: Account) {
   // console.log(`Request for metadata for admin account ${admin} received.`);
 
   const payload: InputViewFunctionData = {
-    function: `${owner.accountAddress}::${module_name}::get_metadata`,
+    function: `${owner.accountAddress}::fa_coin::get_metadata`,
     functionArguments: [],
   };
   const res = (await aptos.view<[{ inner: Account }]>({ payload }))[0];
@@ -441,22 +444,11 @@ export async function getAdminTransferList() {
   // console.log(`Request for metadata for admin account ${admin} received.`);
 
   const payload: InputViewFunctionData = {
-    function: `${owner.accountAddress}::${module_name}::get_admin_transfer`,
+    function: `${owner.accountAddress}::fa_coin::get_admin_transfer`,
     functionArguments: [],
   };
   const res = await aptos.view({ payload });
-  console.log("🚀 ~ getAdminTransfer ~ res:", res);
-
-  return res.toString();
-}
-// To get the list of the list of addresses with minter role
-export async function getSignersList() {
-  const payload: InputViewFunctionData = {
-    function: `${owner.accountAddress}::${module_name}::get_signers`,
-    functionArguments: [],
-  };
-  const res = await aptos.view({ payload });
-  console.log("🚀 ~ getSignerList ~ res:", res);
+  console.log("🚀 ~ getMinterList ~ res:", res);
 
   return res.toString();
 }
@@ -465,7 +457,7 @@ export async function getMinterList() {
   // console.log(`Request for metadata for admin account ${admin} received.`);
 
   const payload: InputViewFunctionData = {
-    function: `${owner.accountAddress}::${module_name}::get_minter`,
+    function: `${owner.accountAddress}::fa_coin::get_minter`,
     functionArguments: [],
   };
   const res = await aptos.view({ payload });
@@ -476,7 +468,7 @@ export async function getMinterList() {
 // Check if user has bucket store or not
 export async function hasBucket(admin: AccountAddress) {
   const payload: InputViewFunctionData = {
-    function: `${owner.accountAddress}::${module_name}::has_bucket_store`, //
+    function: `${owner.accountAddress}::fa_coin::has_bucket_store`, //
     functionArguments: [admin],
   };
   const res = (await aptos.view({ payload }))[0];
@@ -486,7 +478,7 @@ export async function hasBucket(admin: AccountAddress) {
 // To get the bucket store of the user
 export async function getBucketStore(admin: Account) {
   const payload: InputViewFunctionData = {
-    function: `${owner.accountAddress}::${module_name}::get_bucket_store`,
+    function: `${owner.accountAddress}::fa_coin::get_bucket_store`,
     functionArguments: [admin.accountAddress],
   };
   const res = await aptos.view({ payload });
@@ -501,30 +493,7 @@ export async function addMinterRole(admin: Account, minter: AccountAddress) {
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::add_minter`,
-      functionArguments: [minter],
-    },
-  });
-
-  const senderAuthenticator = await aptos.transaction.sign({
-    signer: admin,
-    transaction,
-  });
-  const pendingTxn = await aptos.transaction.submit.simple({
-    transaction,
-    senderAuthenticator,
-  });
-
-  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
-
-  return pendingTxn.hash;
-}
-// Remove minter role to an account
-export async function removeMinterRole(admin: Account, minter: AccountAddress) {
-  const transaction = await aptos.transaction.build.simple({
-    sender: admin.accountAddress,
-    data: {
-      function: `${owner.accountAddress}::${module_name}::remove_minter_role`,
+      function: `${owner.accountAddress}::fa_coin::add_minter`,
       functionArguments: [minter],
     },
   });
@@ -547,30 +516,7 @@ export async function addSigner(admin: Account, admin_transfer: Uint8Array) {
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::add_signer_pkey`,
-      functionArguments: [admin_transfer],
-    },
-  });
-
-  const senderAuthenticator = await aptos.transaction.sign({
-    signer: admin,
-    transaction,
-  });
-  const pendingTxn = await aptos.transaction.submit.simple({
-    transaction,
-    senderAuthenticator,
-  });
-
-  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
-
-  return pendingTxn.hash;
-}
-// Add admin transfer role to an account
-export async function removeSigner(admin: Account, admin_transfer: Uint8Array) {
-  const transaction = await aptos.transaction.build.simple({
-    sender: admin.accountAddress,
-    data: {
-      function: `${owner.accountAddress}::${module_name}::remove_signer_role`,
+      function: `${owner.accountAddress}::fa_coin::add_signer_pkey`,
       functionArguments: [admin_transfer],
     },
   });
@@ -596,33 +542,7 @@ export async function addAdminTransferRole(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::add_admin_transfer`,
-      functionArguments: [admin_transfer],
-    },
-  });
-
-  const senderAuthenticator = await aptos.transaction.sign({
-    signer: admin,
-    transaction,
-  });
-  const pendingTxn = await aptos.transaction.submit.simple({
-    transaction,
-    senderAuthenticator,
-  });
-
-  await aptos.waitForTransaction({ transactionHash: pendingTxn.hash });
-
-  return pendingTxn.hash;
-}
-// Add admin transfer role to an account
-export async function removeAdminTransferRole(
-  admin: Account,
-  admin_transfer: AccountAddress
-) {
-  const transaction = await aptos.transaction.build.simple({
-    sender: admin.accountAddress,
-    data: {
-      function: `${owner.accountAddress}::${module_name}::remove_admin_transfer_role`,
+      function: `${owner.accountAddress}::fa_coin::add_admin_transfer`,
       functionArguments: [admin_transfer],
     },
   });
@@ -652,7 +572,7 @@ export async function mintCoin(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::mint`,
+      function: `${owner.accountAddress}::fa_coin::mint`,
       functionArguments: [receiver, amount, reward1, reward2, reward3],
     },
   });
@@ -682,7 +602,7 @@ export async function bulkMintCoin(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::bulk_mint`,
+      function: `${owner.accountAddress}::fa_coin::bulk_mint`,
       functionArguments: [receiver, amount, reward1, reward2, reward3],
     },
   });
@@ -708,7 +628,7 @@ export async function adminTransfer(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::admin_transfer`,
+      function: `${owner.accountAddress}::fa_coin::admin_transfer`,
       functionArguments: [to, deductionFromSender, additionToRecipient],
     },
   });
@@ -735,7 +655,7 @@ export async function adminTransferBulk(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::admin_transfer_bulk`,
+      function: `${owner.accountAddress}::fa_coin::admin_transfer_bulk`,
       functionArguments: [to, deductionFromSender, additionToRecipient],
     },
   });
@@ -761,7 +681,7 @@ export async function transferReward3ToReward1ByAdminOnly(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::admin_transfer_reward3_to_user_bucket1`,
+      function: `${owner.accountAddress}::fa_coin::admin_transfer_reward3_to_user_bucket1`,
       functionArguments: [user, amount],
     },
   });
@@ -785,7 +705,7 @@ export async function transferReward3ToReward1ByAdminOnlyInBulk(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::admin_transfer_reward3_to_user_bucket1_bulk`,
+      function: `${owner.accountAddress}::fa_coin::admin_transfer_reward3_to_user_bucket1_bulk`,
       functionArguments: [user, amount],
     },
   });
@@ -809,7 +729,7 @@ export async function transferReward3ToReward2ByAdminOnly(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::admin_transfer_reward3_to_user_bucket2`,
+      function: `${owner.accountAddress}::fa_coin::admin_transfer_reward3_to_user_bucket2`,
       functionArguments: [user, amount],
     },
   });
@@ -833,7 +753,7 @@ export async function transferReward3ToReward2ByAdminOnlyInBulk(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::admin_transfer_reward3_to_user_bucket2_bulk`,
+      function: `${owner.accountAddress}::fa_coin::admin_transfer_reward3_to_user_bucket2_bulk`,
       functionArguments: [user, amount],
     },
   });
@@ -857,7 +777,7 @@ export async function burnCoin(
     const transaction = await aptos.transaction.build.simple({
       sender: admin.accountAddress,
       data: {
-        function: `${owner.accountAddress}::${module_name}::burn`,
+        function: `${owner.accountAddress}::fa_coin::burn`,
         functionArguments: [fromAddress, amount],
       },
     });
@@ -887,7 +807,7 @@ export async function freeze(
     const transaction = await aptos.transaction.build.simple({
       sender: admin.accountAddress,
       data: {
-        function: `${owner.accountAddress}::${module_name}::freeze_account`,
+        function: `${owner.accountAddress}::fa_coin::freeze_account`,
         functionArguments: [targetAddress],
       },
     });
@@ -919,7 +839,7 @@ export async function unfreeze(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::unfreeze_account`,
+      function: `${owner.accountAddress}::fa_coin::unfreeze_account`,
       functionArguments: [targetAddress],
     },
   });
@@ -950,7 +870,7 @@ export async function adminTransferWithSignature(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::admin_transfer_with_signature`,
+      function: `${owner.accountAddress}::fa_coin::admin_transfer_with_signature`,
       functionArguments: [
         toAddress,
         deductionFromSender,
@@ -985,7 +905,7 @@ export async function adminTransferWithSignatureBulk(
   const transaction = await aptos.transaction.build.simple({
     sender: admin.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::admin_transfer_with_signature_bulk`,
+      function: `${owner.accountAddress}::fa_coin::admin_transfer_with_signature_bulk`,
       functionArguments: [
         to,
         deductnFromSender1,
@@ -1021,7 +941,7 @@ export async function transferCoin(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer`,
+      function: `${owner.accountAddress}::fa_coin::transfer`,
       functionArguments: [toAddress, amount],
     },
   });
@@ -1047,7 +967,7 @@ export async function transferCoinBulk(
     const transaction = await aptos.transaction.build.simple({
       sender: from.accountAddress,
       data: {
-        function: `${owner.accountAddress}::${module_name}::bulk_transfer`,
+        function: `${owner.accountAddress}::fa_coin::bulk_transfer`,
         functionArguments: [toAddress, amount],
       },
     });
@@ -1075,7 +995,7 @@ export async function transferFromBucketToReward3(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer_to_reward3`,
+      function: `${owner.accountAddress}::fa_coin::transfer_to_reward3`,
       functionArguments: [to, bucket],
     },
   });
@@ -1101,7 +1021,7 @@ export async function transferFromBucketToReward3Bulk(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer_to_reward3_bulk`,
+      function: `${owner.accountAddress}::fa_coin::transfer_to_reward3_bulk`,
       functionArguments: [to, bucket],
     },
   });
@@ -1126,7 +1046,7 @@ export async function transferFromReward3ToReward3(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer_reward3_to_reward3`,
+      function: `${owner.accountAddress}::fa_coin::transfer_reward3_to_reward3`,
       functionArguments: [to, amount],
     },
   });
@@ -1151,7 +1071,7 @@ export async function transferFromReward3ToReward3Bulk(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer_reward3_to_reward3_bulk`,
+      function: `${owner.accountAddress}::fa_coin::transfer_reward3_to_reward3_bulk`,
       functionArguments: [to, amount],
     },
   });
@@ -1215,7 +1135,7 @@ export async function transferReward3ToReward1WithSign(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer_reward3_to_reward1`,
+      function: `${owner.accountAddress}::fa_coin::transfer_reward3_to_reward1`,
       functionArguments: [to, amount, signature.toUint8Array()],
     },
   });
@@ -1242,7 +1162,7 @@ export async function transferReward3ToReward1BulkWithSign(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer_reward3_to_reward1_bulk`,
+      function: `${owner.accountAddress}::fa_coin::transfer_reward3_to_reward1_bulk`,
       functionArguments: [to, amount, signature.toUint8Array()],
     },
   });
@@ -1269,7 +1189,7 @@ export async function transferReward3ToReward2WithSign(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer_reward3_to_reward2`,
+      function: `${owner.accountAddress}::fa_coin::transfer_reward3_to_reward2`,
       functionArguments: [to, amount, signature.toUint8Array()],
     },
   });
@@ -1296,7 +1216,7 @@ export async function transferReward3ToReward2BulkWithSign(
   const transaction = await aptos.transaction.build.simple({
     sender: from.accountAddress,
     data: {
-      function: `${owner.accountAddress}::${module_name}::transfer_reward3_to_reward2_bulk`,
+      function: `${owner.accountAddress}::fa_coin::transfer_reward3_to_reward2_bulk`,
       functionArguments: [to, amount, signature.toUint8Array()],
     },
   });
@@ -1348,228 +1268,193 @@ async function main_1() {
   let deployedTx = await compileAndDeploy();
   console.log("🚀 ~ main ~ deployedTx:", deployedTx);
 
-  /*   ----- Functions for view data from modules ----- */
+  // /*   ----- Functions for view data from modules ----- */
 
-  const metadata = await getMetadata(owner);
-  let metadataAddress = metadata.toString();
-  console.log("metadata address:", metadataAddress);
+  // const metadata = await getMetadata(owner);
+  // let metadataAddress = metadata.toString();
+  // console.log("metadata address:", metadataAddress);
 
-  console.log("Minter List: ", await getMinterList());
-  console.log("Admin transfer List: ", await getAdminTransferList());
+  // console.log("Minter List: ", await getMinterList());
+  // console.log("Admin transfer List: ", await getAdminTransferList());
 
-  /* Only admin can invoke these functions */
+  // /* Only admin can invoke these functions */
 
-  console.log(
-    "\nOwner mints the 1000 kcash in own account: ",
-    await mintCoin(owner, owner.accountAddress, 1000, 300, 300, 400)
-  );
+  // console.log(
+  //   "\nOwner mints the 1000 kcash in own account: ",
+  //   await mintCoin(owner, owner.accountAddress, 1000, 300, 300, 400)
+  // );
 
-  console.log("\nOwner mints the 500 kcash in bulk of accounts: ");
-  console.log("300 kcash in user1's account and 200 kcash in user2's account");
-  await bulkMintCoin(
-    owner,
-    [user1.accountAddress, user2.accountAddress],
-    [300, 200],
-    [100, 70],
-    [100, 70],
-    [100, 60]
-  );
+  // console.log("\nOwner mints the 500 kcash in bulk of accounts: ");
+  // console.log("300 kcash in user1's account and 200 kcash in user2's account");
+  // await bulkMintCoin(
+  //   owner,
+  //   [user1.accountAddress, user2.accountAddress],
+  //   [300, 200],
+  //   [100, 70],
+  //   [100, 70],
+  //   [100, 60]
+  // );
 
-  await printVal(metadataAddress);
+  // await printVal(metadataAddress);
 
-  console.log(
-    "\nOwner transfer 10 kcash to user1 according to value provided: ",
-    await adminTransfer(owner, user1.accountAddress, [2, 2, 6], [3, 3, 4])
-  );
-  console.log("\nOwner transfer the 20 kcash in bulk of accounts: ");
-  console.log("10 kcash in user1's account and 10 kcash in user2's account");
-  await adminTransferBulk(
-    owner,
-    [user1.accountAddress, user2.accountAddress],
-    [
-      [2, 4, 4],
-      [4, 3, 3],
-    ],
-    [
-      [2, 3, 5],
-      [5, 5, 0],
-    ]
-  );
-  await printVal(metadataAddress);
+  // console.log(
+  //   "\nOwner transfer 10 kcash to user1 according to value provided: ",
+  //   await adminTransfer(owner, user1.accountAddress, [2, 2, 6], [3, 3, 4])
+  // );
+  // console.log("\nOwner transfer the 20 kcash in bulk of accounts: ");
+  // console.log("10 kcash in user1's account and 10 kcash in user2's account");
+  // await adminTransferBulk(
+  //   owner,
+  //   [user1.accountAddress, user2.accountAddress],
+  //   [
+  //     [2, 4, 4],
+  //     [4, 3, 3],
+  //   ],
+  //   [
+  //     [2, 3, 5],
+  //     [5, 5, 0],
+  //   ]
+  // );
+  // await printVal(metadataAddress);
 
-  console.log(
-    "Adding new account as admint trasnfer role: ",
-    await addAdminTransferRole(owner, user1.accountAddress)
-  );
-  console.log(
-    "Admin transfer List updated, user1 now has transfer role: ",
-    await getAdminTransferList()
-  );
+  // console.log(
+  //   "Adding new account as admint trasnfer role: ",
+  //   await addAdminTransferRole(owner, user1.accountAddress)
+  // );
+  // console.log(
+  //   "Admin transfer List updated, user1 now has transfer role: ",
+  //   await getAdminTransferList()
+  // );
 
-  console.log(
-    "User1 can transfer 1 kcash from its reward3 to user2's reward1 as an admin: ",
-    await transferReward3ToReward1ByAdminOnly(user1, user2.accountAddress, 1)
-  );
-  await printVal(metadataAddress);
+  // console.log(
+  //   "User1 can transfer 1 kcash from its reward3 to user2's reward1 as an admin: ",
+  //   await transferReward3ToReward1ByAdminOnly(user1, user2.accountAddress, 1)
+  // );
+  // await printVal(metadataAddress);
 
-  console.log("\n*** Admint transfer with signature ***");
-  let o_nonce = await getNonce(owner);
-  console.log("Owner :", o_nonce);
+  // console.log("\n*** Admint transfer with signature ***");
+  // let o_nonce = await getNonce(owner);
+  // console.log("Owner :", o_nonce);
 
-  let t_msg = await createStructForAdminTransferSig(
-    owner.accountAddress,
-    user1.accountAddress,
-    [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
-    [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
-    "admin_transfer_with_signature",
-    new Uint64(BigInt(o_nonce))
-  );
+  // let t_msg = await createStructForAdminTransferSig(
+  //   owner.accountAddress,
+  //   user1.accountAddress,
+  //   [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+  //   [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+  //   "admin_transfer_with_signature",
+  //   new Uint64(BigInt(o_nonce))
+  // );
 
-  let t_msg_bytes = t_msg.bcsToBytes();
-  let t_msg_hash = sha256(t_msg_bytes);
-  let sign = await signMessage(privateKeyOwner, t_msg_hash);
+  // let t_msg_bytes = t_msg.bcsToBytes();
+  // let t_msg_hash = sha256(t_msg_bytes);
+  // let sign = await signMessage(privateKeyOwner, t_msg_hash);
 
-  await adminTransferWithSignature(
-    owner,
-    user1.accountAddress,
-    [1, 1, 1],
-    [1, 1, 1],
-    sign
-  );
-  await printVal(metadataAddress);
+  // await adminTransferWithSignature(
+  //   owner,
+  //   user1.accountAddress,
+  //   [1, 1, 1],
+  //   [1, 1, 1],
+  //   sign
+  // );
+  // await printVal(metadataAddress);
 
-  console.log(
-    "Add new signer now, signer_kp is a new signer: ",
-    await addSigner(owner, signer_public.toUint8Array())
-  );
+  // console.log(
+  //   "Add new signer now, signer_kp is a new signer: ",
+  //   await addSigner(owner, signer_public.toUint8Array())
+  // );
 
-  console.log("\nNow user1 transfer the funds in bulk with signature");
-  let u_nonce = await getNonce(user1);
+  // console.log("\nNow user1 transfer the funds in bulk with signature");
+  // let u_nonce = await getNonce(user1);
 
-  let t_msgB = await createStructForAdminTransferSigBulk(
-    user1.accountAddress,
-    [user2.accountAddress, owner.accountAddress, signer.accountAddress],
-    [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
-    [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
-    [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
-    [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
-    [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
-    [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
-    "admin_transfer_with_signature_bulk",
-    new Uint64(BigInt(u_nonce))
-  );
+  // let t_msgB = await createStructForAdminTransferSigBulk(
+  //   user1.accountAddress,
+  //   [user2.accountAddress, owner.accountAddress, signer.accountAddress],
+  //   [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+  //   [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+  //   [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+  //   [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+  //   [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+  //   [new Uint64(BigInt(1)), new Uint64(BigInt(1)), new Uint64(BigInt(1))],
+  //   "admin_transfer_with_signature_bulk",
+  //   new Uint64(BigInt(u_nonce))
+  // );
 
-  let t_msgB_bytes = t_msgB.bcsToBytes();
-  let t_msgBHash = sha256(t_msgB_bytes);
-  let sign2 = await signMessage(signer_pk, t_msgBHash);
-  console.log("🚀 ~ main_1 ~ sign2:", sign2);
+  // let t_msgB_bytes = t_msgB.bcsToBytes();
+  // let t_msgBHash = sha256(t_msgB_bytes);
+  // let sign2 = await signMessage(signer_pk, t_msgBHash);
+  // console.log("🚀 ~ main_1 ~ sign2:", sign2);
 
-  let e = await adminTransferWithSignatureBulk(
-    user1,
-    [user2.accountAddress, owner.accountAddress, signer.accountAddress],
-    [1, 1, 1],
-    [1, 1, 1],
-    [1, 1, 1],
-    [1, 1, 1],
-    [1, 1, 1],
-    [1, 1, 1],
-    sign2
-  );
-  console.log("e: ", e);
+  // let e = await adminTransferWithSignatureBulk(
+  //   user1,
+  //   [user2.accountAddress, owner.accountAddress, signer.accountAddress],
+  //   [1, 1, 1],
+  //   [1, 1, 1],
+  //   [1, 1, 1],
+  //   [1, 1, 1],
+  //   [1, 1, 1],
+  //   [1, 1, 1],
+  //   sign2
+  // );
+  // console.log("e: ", e);
 
-  await printVal(metadataAddress);
+  // await printVal(metadataAddress);
 
-  /* Any user can invoke these functions */
-  console.log("user2 transfer 2 kcash to user1's bucket 3");
-  await transferCoin(user2, user1.accountAddress, 2);
+  // /* Any user can invoke these functions */
+  // console.log("user2 transfer 2 kcash to user1's bucket 3");
+  // await transferCoin(user2, user1.accountAddress, 2);
 
-  await printVal(metadataAddress);
+  // await printVal(metadataAddress);
 
-  console.log(
-    "user2 transfer 3 kcash to user1's bucket 3 and 1 in signer's bucket 3"
-  );
-  await transferCoinBulk(
-    user2,
-    [user1.accountAddress, signer.accountAddress],
-    [3, 1]
-  );
-  await printVal(metadataAddress);
+  // console.log(
+  //   "user2 transfer 3 kcash to user1's bucket 3 and 1 in signer's bucket 3"
+  // );
+  // await transferCoinBulk(
+  //   user2,
+  //   [user1.accountAddress, signer.accountAddress],
+  //   [3, 1]
+  // );
+  // await printVal(metadataAddress);
 
-  console.log(
-    "User1 transfer 4 kcash from its bucket3 in bulk to the three diffeent account's bucket3"
-  );
-  await transferFromReward3ToReward3Bulk(
-    user1,
-    [user2.accountAddress, owner.accountAddress, signer.accountAddress],
-    [2, 1, 1]
-  );
-  await printVal(metadataAddress);
+  // console.log(
+  //   "User1 transfer 4 kcash from its bucket3 in bulk to the three diffeent account's bucket3"
+  // );
+  // await transferFromReward3ToReward3Bulk(
+  //   user1,
+  //   [user2.accountAddress, owner.accountAddress, signer.accountAddress],
+  //   [2, 1, 1]
+  // );
+  // await printVal(metadataAddress);
 
-  /* *** Methods that requires signature *** */
+  // /* *** Methods that requires signature *** */
 
-  console.log(
-    "User2 will transfer from bucket3 to users bucket1 using signature (BULK METHOD)"
-  );
-  let u_nonce1 = await getNonce(user2);
-  console.log("🚀 ~ main_1 ~ u_nonce1:", u_nonce1);
+  // console.log(
+  //   "User2 will transfer from bucket3 to users bucket1 using signature (BULK METHOD)"
+  // );
+  // let u_nonce1 = await getNonce(user2);
+  // console.log("🚀 ~ main_1 ~ u_nonce1:", u_nonce1);
 
-  let msg1 = await createStructForMsgBulk(
-    user2.accountAddress,
-    [user1.accountAddress, owner.accountAddress],
-    [new Uint64(BigInt(2)), new Uint64(BigInt(3))],
-    "transfer_reward3_to_reward1_bulk",
-    new Uint64(BigInt(u_nonce1))
-  );
+  // let msg1 = await createStructForMsgBulk(
+  //   user2.accountAddress,
+  //   [user1.accountAddress, owner.accountAddress],
+  //   [new Uint64(BigInt(2)), new Uint64(BigInt(3))],
+  //   "transfer_reward3_to_reward1_bulk",
+  //   new Uint64(BigInt(u_nonce1))
+  // );
 
-  let msg1Bytes = msg1.bcsToBytes();
-  let msg1Hash = sha256(msg1Bytes);
-  console.log("🚀 ~ main_1 ~ msg1Hash:", msg1Hash);
-  let sig1 = await signMessage(privateKeyOwner, msg1Hash);
+  // let msg1Bytes = msg1.bcsToBytes();
+  // let msg1Hash = sha256(msg1Bytes);
+  // console.log("🚀 ~ main_1 ~ msg1Hash:", msg1Hash);
+  // let sig1 = await signMessage(privateKeyOwner, msg1Hash);
 
-  let tx = await transferReward3ToReward1BulkWithSign(
-    user2,
-    [user1.accountAddress, owner.accountAddress],
-    [2, 3],
-    sig1
-  );
-  console.log("🚀 ~ main_1 ~ tx:", tx);
+  // let tx = await transferReward3ToReward1BulkWithSign(
+  //   user2,
+  //   [user1.accountAddress, owner.accountAddress],
+  //   [2, 3],
+  //   sig1
+  // );
+  // console.log("🚀 ~ main_1 ~ tx:", tx);
 
-  await printVal(metadataAddress);
-
-  console.log(
-    "Assigning minter role to user 1",
-    await addMinterRole(owner, user1.accountAddress)
-  );
-
-  /* Remove admin transfer ability from user1 */
-  console.log("Minter list: ", await getMinterList());
-  console.log(
-    "Removing the minter role of user1: ",
-    await removeMinterRole(owner, user1.accountAddress)
-  );
-  console.log("Minter list after removing an acount: ", await getMinterList());
-
-  // /* Remove admin transfer ability from user1 */
-  console.log("Adimin transfer list: ", await getAdminTransferList());
-  console.log(
-    "Removing the admin transfer role of user1: ",
-    await removeAdminTransferRole(owner, user1.accountAddress)
-  );
-  console.log(
-    "Admin transfer list after removing an acount: ",
-    await getAdminTransferList()
-  );
-
-  // /* Remove admin transfer ability from user1 */
-  console.log("Signers list: ", await getSignersList());
-  console.log(
-    "Removing the signer role of signer: ",
-    await removeSigner(owner, signer.publicKey.toUint8Array())
-  );
-  console.log(
-    "Signer list after removing an acount: ",
-    await getAdminTransferList()
-  );
+  // await printVal(metadataAddress)
 }
 
 main_1();

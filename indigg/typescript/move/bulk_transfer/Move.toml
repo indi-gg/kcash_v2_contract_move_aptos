@@ -1,0 +1,22 @@
+[package]
+name = "bulk_transfer"
+version = "1.0.0"
+authors = []
+
+[addresses]
+BulkTransfer = "0xb7f5dd022310be46f769af231fb761b9ca18bc2f63237cb6d004aed8ce01336c"
+
+[dev-addresses]
+BulkTransfer = "0x12345"
+
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dependencies.AptosTokenObjects]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'mainnet'
+subdir = 'aptos-move/framework/aptos-token-objects'
+
